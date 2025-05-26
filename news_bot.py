@@ -10,6 +10,7 @@ import time
 from urllib.parse import urljoin
 import html
 import chardet
+from keep_alive import keep_alive
 
 # Cấu hình bot
 intents = discord.Intents.default()
@@ -782,6 +783,10 @@ async def help_command(ctx):
 if __name__ == "__main__":
     try:
         print("🚀 Đang khởi động News Bot bảo mật...")
+
+        # Khởi động web server để keep alive
+        keep_alive()
+        
         print("🔑 Đang kiểm tra token từ Environment Variables...")
         
         if TOKEN:
