@@ -12,16 +12,17 @@ from urllib.parse import urljoin
 import html
 import chardet
 import pytz
+import json
 from keep_alive import keep_alive
 
-# 🆕 THÊM CÁC THỬ VIỆN MẠNH MẼ CHO TRÍCH XUẤT NỘI DUNG
+# 🆕 THÊM CÁC THỬ VIỆN NÂNG CAO (OPTIONAL)
 try:
     import trafilatura
     TRAFILATURA_AVAILABLE = True
     print("✅ Trafilatura đã được tích hợp - Trích xuất nội dung cải tiến!")
 except ImportError:
     TRAFILATURA_AVAILABLE = False
-    print("⚠️ Trafilatura chưa cài đặt. Chạy: pip install trafilatura")
+    print("⚠️ Trafilatura không có sẵn - Sẽ dùng phương pháp cơ bản")
 
 try:
     import newspaper
@@ -30,41 +31,40 @@ try:
     print("✅ Newspaper3k đã được tích hợp - Fallback extraction!")
 except ImportError:
     NEWSPAPER_AVAILABLE = False
-    print("⚠️ Newspaper3k chưa cài đặt. Chạy: pip install newspaper3k")
+    print("⚠️ Newspaper3k không có sẵn - Sẽ dùng phương pháp cơ bản")
 
-# 🤖 THÊM AI GIẢI THÍCH THÔNG MINH
+# 🤖 AI FEATURES (HOÀN TOÀN OPTIONAL)
 try:
     import groq
     GROQ_AVAILABLE = True
-    print("🚀 Groq AI đã được tích hợp - Giải thích thông minh!")
+    print("🚀 Groq AI đã được tích hợp - AI features khả dụng!")
 except ImportError:
     GROQ_AVAILABLE = False
-    print("⚠️ Groq chưa cài đặt. Chạy: pip install groq")
+    print("ℹ️ Groq AI không có sẵn - Bot sẽ chạy ở chế độ cơ bản")
 
 try:
     from googleapiclient.discovery import build
     GOOGLE_SEARCH_AVAILABLE = True
-    print("🔍 Google Search API đã được tích hợp - Tìm nguồn tin đáng tin cậy!")
+    print("🔍 Google Search API đã được tích hợp - AI search khả dụng!")
 except ImportError:
     GOOGLE_SEARCH_AVAILABLE = False
-    print("⚠️ Google API Client chưa cài đặt. Chạy: pip install google-api-python-client")
-
-import json
+    print("ℹ️ Google Search API không có sẵn - AI search không khả dụng")
 
 # Cấu hình bot
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# 🔒 BẢO MẬT: Lấy token từ environment variable
+# 🔒 BẢO MẬT: Lấy token từ environment variable (BẮT BUỘC)
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# 🤖 CẤU HÌNH AI APIS
+# 🤖 CẤU HÌNH AI APIS (HOÀN TOÀN OPTIONAL)
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GOOGLE_CSE_ID = os.getenv('GOOGLE_CSE_ID')
 
-# Khởi tạo Groq client
+# Khởi tạo Groq client (chỉ nếu có sẵn và có API key)
+groq_client = None
 if GROQ_AVAILABLE and GROQ_API_KEY:
     try:
         groq_client = groq.Groq(api_key=GROQ_API_KEY)
@@ -72,10 +72,14 @@ if GROQ_AVAILABLE and GROQ_API_KEY:
     except Exception as e:
         print(f"⚠️ Lỗi khởi tạo Groq client: {e}")
         GROQ_AVAILABLE = False
+        groq_client = None
 else:
     GROQ_AVAILABLE = False
+    if not GROQ_API_KEY:
+        print("ℹ️ GROQ_API_KEY không được cấu hình - AI features bị tắt")
 
-# Khởi tạo Google Search client
+# Khởi tạo Google Search client (chỉ nếu có sẵn và có API key)
+google_search_service = None
 if GOOGLE_SEARCH_AVAILABLE and GOOGLE_API_KEY and GOOGLE_CSE_ID:
     try:
         google_search_service = build("customsearch", "v1", developerKey=GOOGLE_API_KEY)
@@ -83,8 +87,11 @@ if GOOGLE_SEARCH_AVAILABLE and GOOGLE_API_KEY and GOOGLE_CSE_ID:
     except Exception as e:
         print(f"⚠️ Lỗi khởi tạo Google Search: {e}")
         GOOGLE_SEARCH_AVAILABLE = False
+        google_search_service = None
 else:
     GOOGLE_SEARCH_AVAILABLE = False
+    if not GOOGLE_API_KEY:
+        print("ℹ️ Google API keys không được cấu hình - AI search bị tắt")
 
 if not TOKEN:
     print("❌ CẢNH BÁO: Không tìm thấy DISCORD_TOKEN trong environment variables!")
@@ -189,10 +196,70 @@ async def on_ready():
         )
     )
 
+async def detect_and_translate_content(content, source_name):
+    """🌐 PHÁT HIỆN VÀ DỊCH NỘI DUNG TIẾNG ANH SANG TIẾNG VIỆT"""
+    try:
+        # Danh sách nguồn tin nước ngoài (tiếng Anh)
+        international_sources = {
+            'yahoo_finance', 'reuters_business', 'bloomberg_markets', 'marketwatch_latest',
+            'forbes_money', 'financial_times', 'business_insider', 'the_economist'
+        }
+        
+        # Chỉ dịch nếu là nguồn nước ngoài và có Groq AI
+        if source_name not in international_sources or not GROQ_AVAILABLE or not groq_client:
+            return content, False
+        
+        # Kiểm tra nếu nội dung có vẻ là tiếng Anh
+        english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 'will', 'would', 'could', 'should']
+        content_lower = content.lower()
+        english_word_count = sum(1 for word in english_indicators if word in content_lower)
+        
+        # Nếu có ít nhất 3 từ tiếng Anh thông dụng thì tiến hành dịch
+        if english_word_count < 3:
+            return content, False
+        
+        print(f"🌐 Đang dịch nội dung từ {source_name} sang tiếng Việt...")
+        
+        # Tạo prompt dịch thuật chuyên nghiệp
+        translation_prompt = f"""Bạn là một chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
+
+YÊU CẦU DỊCH:
+1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
+2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
+3. Dịch tự nhiên, không máy móc
+4. Giữ nguyên các con số, tỷ lệ phần trăm
+5. Không thêm giải thích hay bình luận
+
+ĐOẠN VĂN CẦN DỊCH:
+{content}
+
+BẢN DỊCH TIẾNG VIỆT:"""
+
+        # Gọi Groq AI để dịch
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": translation_prompt
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.1,  # Ít creativity để dịch chính xác
+            max_tokens=2000
+        )
+        
+        translated_content = chat_completion.choices[0].message.content.strip()
+        print("✅ Dịch thuật thành công")
+        return translated_content, True
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi dịch thuật: {e}")
+        return content, False
+
 async def search_reliable_sources(query, max_results=5):
     """🔍 TÌM KIẾM NGUỒN TIN ĐÁNG TIN CẬY BẰNG GOOGLE SEARCH API"""
     try:
-        if not GOOGLE_SEARCH_AVAILABLE:
+        if not GOOGLE_SEARCH_AVAILABLE or not google_search_service:
             return []
         
         print(f"🔍 Tìm kiếm: {query}")
@@ -255,70 +322,10 @@ def extract_source_name(url):
     except:
         return 'Unknown Source'
 
-async def detect_and_translate_content(content, source_name):
-    """🌐 PHÁT HIỆN VÀ DỊCH NỘI DUNG TIẾNG ANH SANG TIẾNG VIỆT"""
-    try:
-        # Danh sách nguồn tin nước ngoài (tiếng Anh)
-        international_sources = {
-            'yahoo_finance', 'reuters_business', 'bloomberg_markets', 'marketwatch_latest',
-            'forbes_money', 'financial_times', 'business_insider', 'the_economist'
-        }
-        
-        # Chỉ dịch nếu là nguồn nước ngoài và có Groq AI
-        if source_name not in international_sources or not GROQ_AVAILABLE:
-            return content, False
-        
-        # Kiểm tra nếu nội dung có vẻ là tiếng Anh
-        english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 'will', 'would', 'could', 'should']
-        content_lower = content.lower()
-        english_word_count = sum(1 for word in english_indicators if word in content_lower)
-        
-        # Nếu có ít nhất 3 từ tiếng Anh thông dụng thì tiến hành dịch
-        if english_word_count < 3:
-            return content, False
-        
-        print(f"🌐 Đang dịch nội dung từ {source_name} sang tiếng Việt...")
-        
-        # Tạo prompt dịch thuật chuyên nghiệp
-        translation_prompt = f"""Bạn là một chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
-
-YÊU CẦU DỊCH:
-1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
-2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
-3. Dịch tự nhiên, không máy móc
-4. Giữ nguyên các con số, tỷ lệ phần trăm
-5. Không thêm giải thích hay bình luận
-
-ĐOẠN VĂN CẦN DỊCH:
-{content}
-
-BẢN DỊCH TIẾNG VIỆT:"""
-
-        # Gọi Groq AI để dịch
-        chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": translation_prompt
-                }
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.1,  # Ít creativity để dịch chính xác
-            max_tokens=2000
-        )
-        
-        translated_content = chat_completion.choices[0].message.content.strip()
-        print("✅ Dịch thuật thành công")
-        return translated_content, True
-        
-    except Exception as e:
-        print(f"⚠️ Lỗi dịch thuật: {e}")
-        return content, False
-
 async def ai_explain_with_sources(question, sources):
     """🤖 SỬ DỤNG GROQ AI ĐỂ GIẢI THÍCH VỚI NGUỒN TIN"""
     try:
-        if not GROQ_AVAILABLE:
+        if not GROQ_AVAILABLE or not groq_client:
             return "⚠️ Groq AI không khả dụng. Vui lòng cấu hình GROQ_API_KEY."
         
         # Tạo context từ các nguồn tin
@@ -364,6 +371,87 @@ Câu trả lời:"""
     except Exception as e:
         print(f"⚠️ Lỗi Groq AI: {e}")
         return f"⚠️ Không thể tạo giải thích AI. Lỗi: {str(e)}"
+
+@bot.command(name='hoi')
+async def ask_economic_question(ctx, *, question):
+    """🤖 HỎI AI VỀ THUẬT NGỮ KINH TẾ VỚI NGUỒN TIN ĐÁNG TIN CẬY"""
+    try:
+        # Kiểm tra AI services có sẵn không
+        if not GROQ_AVAILABLE and not GOOGLE_SEARCH_AVAILABLE:
+            embed = discord.Embed(
+                title="⚠️ Tính năng AI chưa sẵn sàng",
+                description="Bot đang chạy ở chế độ cơ bản. Để kích hoạt AI:\n• Cấu hình GROQ_API_KEY (miễn phí tại groq.com)\n• Cấu hình GOOGLE_API_KEY & GOOGLE_CSE_ID",
+                color=0xff6b6b
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        # Thông báo đang xử lý
+        processing_msg = await ctx.send("🤖 Đang tìm kiếm nguồn tin đáng tin cậy và phân tích...")
+        
+        # Bước 1: Tìm kiếm nguồn tin đáng tin cậy
+        sources = await search_reliable_sources(question, max_results=5)
+        
+        # Bước 2: Sử dụng AI để giải thích
+        if sources:
+            explanation = await ai_explain_with_sources(question, sources)
+        else:
+            # Fallback: AI giải thích mà không có nguồn tin cụ thể
+            explanation = await ai_explain_with_sources(question, [])
+        
+        # Xóa thông báo processing
+        await processing_msg.delete()
+        
+        # Tạo embed đẹp mắt
+        embed = discord.Embed(
+            title=f"🤖 Trả lời: {question.title()}",
+            description=explanation,
+            color=0x9932cc,
+            timestamp=ctx.message.created_at
+        )
+        
+        # Thêm thông tin AI sử dụng
+        ai_info = "🚀 Groq AI" if GROQ_AVAILABLE else "🤖 AI cơ bản"
+        if GOOGLE_SEARCH_AVAILABLE and sources:
+            ai_info += f" + 🔍 Google Search ({len(sources)} nguồn)"
+        
+        embed.add_field(
+            name="🧠 Công nghệ sử dụng",
+            value=ai_info,
+            inline=True
+        )
+        
+        # Thêm nguồn tin tham khảo nếu có
+        if sources:
+            sources_text = ""
+            for i, source in enumerate(sources[:3], 1):  # Chỉ hiển thị 3 nguồn đầu
+                sources_text += f"{i}. **{source['source_name']}**: [{source['title'][:50]}...]({source['link']})\n"
+            
+            embed.add_field(
+                name="📰 Nguồn tin tham khảo",
+                value=sources_text,
+                inline=False
+            )
+        
+        # Thêm hướng dẫn sử dụng
+        embed.add_field(
+            name="💡 Gợi ý",
+            value="Gõ `!hoi [câu hỏi]` để hỏi thêm\nVí dụ: `!hoi lạm phát là gì`, `!hoi GDP nghĩa là gì`",
+            inline=False
+        )
+        
+        embed.set_footer(text="🤖 AI Assistant • Nguồn tin đã được kiểm chứng • !menu để xem thêm lệnh")
+        
+        await ctx.send(embed=embed)
+        
+        # Log để debug
+        print(f"✅ Đã trả lời '{question}' cho user {ctx.author.name}")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi khi trả lời: {str(e)}")
+        print(f"❌ Lỗi trong lệnh !hoi: {e}")
+
+async def fetch_content_with_trafilatura(url):
     """🆕 TRÍCH XUẤT NỘI DUNG BẰNG TRAFILATURA - TỐT NHẤT 2024"""
     try:
         if not TRAFILATURA_AVAILABLE:
@@ -394,103 +482,11 @@ Câu trả lời:"""
             
             return content.strip()
         
-async def fetch_content_with_newspaper(url):
-    """📰 TRÍCH XUẤT BẰNG NEWSPAPER3K - FALLBACK"""
-    try:
-        if not NEWSPAPER_AVAILABLE:
-            return None
-        
-        print(f"📰 Sử dụng Newspaper3k cho: {url}")
-        
-        # Tạo article object
-        article = Article(url)
-        article.download()
-        article.parse()
-        
-        if article.text:
-            content = article.text
-            
-            # Giới hạn độ dài
-            if len(content) > 2000:
-                content = content[:2000] + "..."
-            
-            return content.strip()
-        
         return None
         
     except Exception as e:
-        print(f"⚠️ Lỗi Newspaper3k cho {url}: {e}")
+        print(f"⚠️ Lỗi Trafilatura cho {url}: {e}")
         return None
-
-async def fetch_content_legacy(url):
-    """🔄 PHƯƠNG PHÁP CŨ - CUỐI CÙNG FALLBACK"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=8, stream=True)
-        response.raise_for_status()
-        
-        # Xử lý encoding
-        raw_content = response.content
-        detected = chardet.detect(raw_content)
-        encoding = detected['encoding'] or 'utf-8'
-        
-        try:
-            content = raw_content.decode(encoding)
-        except:
-            content = raw_content.decode('utf-8', errors='ignore')
-        
-        # Loại bỏ HTML tags cơ bản
-        clean_content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        clean_content = re.sub(r'<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
-        clean_content = re.sub(r'<[^>]+>', ' ', clean_content)
-        clean_content = html.unescape(clean_content)
-        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
-        
-        # Lấy phần đầu có ý nghĩa
-        sentences = clean_content.split('. ')
-        meaningful_content = []
-        
-        for sentence in sentences[:8]:
-            if len(sentence.strip()) > 20:
-                meaningful_content.append(sentence.strip())
-                
-        result = '. '.join(meaningful_content)
-        
-        if len(result) > 1800:
-            result = result[:1800] + "..."
-            
-        return result if result else "Không thể trích xuất nội dung từ bài viết này."
-        
-    except Exception as e:
-        print(f"⚠️ Lỗi legacy extraction từ {url}: {e}")
-        return f"Không thể lấy nội dung chi tiết. Lỗi: {str(e)}"
-
-async def fetch_full_content_improved(url):
-    """🆕 TRÍCH XUẤT NỘI DUNG CẢI TIẾN - SỬ DỤNG 3 PHƯƠNG PHÁP"""
-    # Thử phương pháp 1: Trafilatura (tốt nhất)
-    content = await fetch_content_with_trafilatura(url)
-    if content and len(content) > 50:
-        print("✅ Thành công với Trafilatura")
-        return content
-    
-    # Thử phương pháp 2: Newspaper3k (fallback)
-    content = await fetch_content_with_newspaper(url)
-    if content and len(content) > 50:
-        print("✅ Thành công với Newspaper3k")
-        return content
-    
-    # Phương pháp 3: Legacy method (cuối cùng)
-    content = await fetch_content_legacy(url)
-    print("⚠️ Sử dụng phương pháp legacy")
-    return content
 
 async def fetch_content_with_newspaper(url):
     """📰 TRÍCH XUẤT BẰNG NEWSPAPER3K - FALLBACK"""
@@ -977,12 +973,7 @@ async def get_news_detail(ctx, news_number: int):
         news = news_list[news_number - 1]
         
         # Thông báo đang tải với thông tin công nghệ
-        if TRAFILATURA_AVAILABLE and NEWSPAPER_AVAILABLE:
-            loading_msg = await ctx.send("🚀 Đang trích xuất nội dung bằng Trafilatura + Newspaper3k...")
-        elif TRAFILATURA_AVAILABLE:
-            loading_msg = await ctx.send("🚀 Đang trích xuất nội dung bằng Trafilatura...")
-        else:
-            loading_msg = await ctx.send("⏳ Đang trích xuất nội dung...")
+        loading_msg = await ctx.send("🚀 Đang trích xuất nội dung...")
         
         # Sử dụng function cải tiến
         full_content = await fetch_full_content_improved(news['link'])
@@ -1181,25 +1172,25 @@ async def help_command(ctx):
     
     # Kiểm tra trạng thái AI services
     ai_status = ""
-    if GROQ_AVAILABLE:
+    if GROQ_AVAILABLE and groq_client:
         ai_status += "🚀 **Groq AI** - Giải thích + Dịch thuật thông minh ✅\n"
     else:
-        ai_status += "⚠️ **Groq AI** - Chưa cấu hình\n"
+        ai_status += "ℹ️ **Groq AI** - Chưa cấu hình (cần GROQ_API_KEY)\n"
     
-    if GOOGLE_SEARCH_AVAILABLE:
+    if GOOGLE_SEARCH_AVAILABLE and google_search_service:
         ai_status += "🔍 **Google Search** - Tìm nguồn tin đáng tin cậy ✅\n"
     else:
-        ai_status += "⚠️ **Google Search** - Chưa cấu hình\n"
+        ai_status += "ℹ️ **Google Search** - Chưa cấu hình (cần API keys)\n"
     
     if TRAFILATURA_AVAILABLE:
-        ai_status += "🚀 **Trafilatura** - Trích xuất nội dung 94.5% ✅\n"
+        ai_status += "🚀 **Trafilatura** - Trích xuất nội dung cải tiến ✅\n"
     else:
-        ai_status += "⚠️ **Trafilatura** - Chưa cài\n"
+        ai_status += "📰 **Legacy Extraction** - Phương pháp cơ bản ✅\n"
     
     if NEWSPAPER_AVAILABLE:
         ai_status += "📰 **Newspaper3k** - Fallback extraction ✅"
     else:
-        ai_status += "⚠️ **Newspaper3k** - Chưa cài"
+        ai_status = ai_status.rstrip('\n')  # Remove trailing newline
     
     embed.add_field(
         name="🚀 Công nghệ tích hợp",
@@ -1231,27 +1222,25 @@ async def help_command(ctx):
     
     if not GROQ_AVAILABLE or not GOOGLE_SEARCH_AVAILABLE:
         embed.add_field(
-            name="⚙️ Cấu hình AI (cho admin)",
+            name="⚙️ Cấu hình AI (optional - để bật thêm tính năng)",
             value="""
-Để kích hoạt AI, thêm vào Environment Variables:
-• **GROQ_API_KEY** - Đăng ký miễn phí tại groq.com
-• **GOOGLE_API_KEY** - Lấy từ Google Cloud Console
-• **GOOGLE_CSE_ID** - Tạo Custom Search Engine
+Bot đã hoạt động đầy đủ ở chế độ cơ bản.
+Để kích hoạt AI features, thêm vào Environment Variables:
+• **GROQ_API_KEY** - Đăng ký miễn phí tại groq.com (AI chat)
+• **GOOGLE_API_KEY** - Google Cloud Console (AI search)
+• **GOOGLE_CSE_ID** - Custom Search Engine
             """,
             inline=False
         )
     
-    embed.set_footer(text="🤖 Bot với AI thông minh • 🌐 Tự động dịch tin nước ngoài • Múi giờ VN chính xác • Groq + Google Search")
+    embed.set_footer(text="🤖 Bot tin tức cải tiến • Múi giờ VN chính xác • AI optional • !menu để xem lại")
     await ctx.send(embed=embed)
 
 # Chạy bot với error handling tốt hơn
 if __name__ == "__main__":
     try:
+        keep_alive()  # Bật web server để keep alive
         print("🚀 Đang khởi động News Bot cải tiến...")
-# Khởi động web server để keep alive
-        keep_alive()
-        
-# ... (phần code còn lại)
         print("🔑 Đang kiểm tra token từ Environment Variables...")
         
         if TOKEN:
@@ -1264,30 +1253,28 @@ if __name__ == "__main__":
         print("🎯 Lĩnh vực: Kinh tế, Chứng khoán, Vĩ mô, Bất động sản")
         print("🕰️ Múi giờ: Đã sửa lỗi - Hiển thị chính xác giờ Việt Nam")
         
-        if TRAFILATURA_AVAILABLE:
-            print("🚀 Trafilatura: Sẵn sàng - Trích xuất nội dung 94.5% độ chính xác")
-        else:
-            print("⚠️ Trafilatura: Chưa cài đặt - Sẽ sử dụng phương pháp cũ")
-            
-        if NEWSPAPER_AVAILABLE:
-            print("📰 Newspaper3k: Sẵn sàng - Fallback extraction")
-        else:
-            print("⚠️ Newspaper3k: Chưa cài đặt - Chỉ dùng Trafilatura")
-        
         # Thông tin AI Services
-        if GROQ_AVAILABLE:
-            print("🤖 Groq AI: Sẵn sàng - AI giải thích + dịch thuật thông minh (1000 calls/ngày)")
+        print("\n🤖 TRẠNG THÁI AI SERVICES:")
+        if GROQ_AVAILABLE and groq_client:
+            print("🚀 Groq AI: Sẵn sàng - AI giải thích + dịch thuật thông minh")
         else:
-            print("⚠️ Groq AI: Chưa cấu hình - Thiếu GROQ_API_KEY")
+            print("ℹ️ Groq AI: Tắt - Bot chạy ở chế độ cơ bản (cần GROQ_API_KEY để bật)")
             
-        if GOOGLE_SEARCH_AVAILABLE:
-            print("🔍 Google Search: Sẵn sàng - Tìm nguồn tin đáng tin cậy (100 queries/ngày)")
+        if GOOGLE_SEARCH_AVAILABLE and google_search_service:
+            print("🔍 Google Search: Sẵn sàng - Tìm nguồn tin đáng tin cậy")
         else:
-            print("⚠️ Google Search: Chưa cấu hình - Thiếu GOOGLE_API_KEY hoặc GOOGLE_CSE_ID")
+            print("ℹ️ Google Search: Tắt - AI search không khả dụng (cần API keys)")
         
-        print("✅ Bot sẵn sàng nhận lệnh!")
-        print("💡 Lệnh AI: !hoi [câu hỏi] - AI trả lời với nguồn tin đáng tin cậy")
-        print("🌐 Tính năng mới: !chitiet tự động dịch tin nước ngoài sang tiếng Việt")
+        if TRAFILATURA_AVAILABLE:
+            print("🚀 Trafilatura: Sẵn sàng - Trích xuất nội dung cải tiến")
+        else:
+            print("📰 Legacy extraction: Sẵn sàng - Phương pháp cơ bản")
+        
+        print("\n✅ Bot sẵn sàng nhận lệnh!")
+        print("💡 Gõ !menu để xem hướng dẫn đầy đủ")
+        if GROQ_AVAILABLE and groq_client:
+            print("🤖 Lệnh AI: !hoi [câu hỏi] - AI trả lời với nguồn tin đáng tin cậy")
+            print("🌐 Tính năng: !chitiet tự động dịch tin nước ngoài sang tiếng Việt")
         
         bot.run(TOKEN)
         
