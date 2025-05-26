@@ -255,6 +255,66 @@ def extract_source_name(url):
     except:
         return 'Unknown Source'
 
+async def detect_and_translate_content(content, source_name):
+    """🌐 PHÁT HIỆN VÀ DỊCH NỘI DUNG TIẾNG ANH SANG TIẾNG VIỆT"""
+    try:
+        # Danh sách nguồn tin nước ngoài (tiếng Anh)
+        international_sources = {
+            'yahoo_finance', 'reuters_business', 'bloomberg_markets', 'marketwatch_latest',
+            'forbes_money', 'financial_times', 'business_insider', 'the_economist'
+        }
+        
+        # Chỉ dịch nếu là nguồn nước ngoài và có Groq AI
+        if source_name not in international_sources or not GROQ_AVAILABLE:
+            return content, False
+        
+        # Kiểm tra nếu nội dung có vẻ là tiếng Anh
+        english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 'will', 'would', 'could', 'should']
+        content_lower = content.lower()
+        english_word_count = sum(1 for word in english_indicators if word in content_lower)
+        
+        # Nếu có ít nhất 3 từ tiếng Anh thông dụng thì tiến hành dịch
+        if english_word_count < 3:
+            return content, False
+        
+        print(f"🌐 Đang dịch nội dung từ {source_name} sang tiếng Việt...")
+        
+        # Tạo prompt dịch thuật chuyên nghiệp
+        translation_prompt = f"""Bạn là một chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
+
+YÊU CẦU DỊCH:
+1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
+2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
+3. Dịch tự nhiên, không máy móc
+4. Giữ nguyên các con số, tỷ lệ phần trăm
+5. Không thêm giải thích hay bình luận
+
+ĐOẠN VĂN CẦN DỊCH:
+{content}
+
+BẢN DỊCH TIẾNG VIỆT:"""
+
+        # Gọi Groq AI để dịch
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": translation_prompt
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.1,  # Ít creativity để dịch chính xác
+            max_tokens=2000
+        )
+        
+        translated_content = chat_completion.choices[0].message.content.strip()
+        print("✅ Dịch thuật thành công")
+        return translated_content, True
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi dịch thuật: {e}")
+        return content, False
+
 async def ai_explain_with_sources(question, sources):
     """🤖 SỬ DỤNG GROQ AI ĐỂ GIẢI THÍCH VỚI NGUỒN TIN"""
     try:
@@ -334,11 +394,103 @@ Câu trả lời:"""
             
             return content.strip()
         
+async def fetch_content_with_newspaper(url):
+    """📰 TRÍCH XUẤT BẰNG NEWSPAPER3K - FALLBACK"""
+    try:
+        if not NEWSPAPER_AVAILABLE:
+            return None
+        
+        print(f"📰 Sử dụng Newspaper3k cho: {url}")
+        
+        # Tạo article object
+        article = Article(url)
+        article.download()
+        article.parse()
+        
+        if article.text:
+            content = article.text
+            
+            # Giới hạn độ dài
+            if len(content) > 2000:
+                content = content[:2000] + "..."
+            
+            return content.strip()
+        
         return None
         
     except Exception as e:
-        print(f"⚠️ Lỗi Trafilatura cho {url}: {e}")
+        print(f"⚠️ Lỗi Newspaper3k cho {url}: {e}")
         return None
+
+async def fetch_content_legacy(url):
+    """🔄 PHƯƠNG PHÁP CŨ - CUỐI CÙNG FALLBACK"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=8, stream=True)
+        response.raise_for_status()
+        
+        # Xử lý encoding
+        raw_content = response.content
+        detected = chardet.detect(raw_content)
+        encoding = detected['encoding'] or 'utf-8'
+        
+        try:
+            content = raw_content.decode(encoding)
+        except:
+            content = raw_content.decode('utf-8', errors='ignore')
+        
+        # Loại bỏ HTML tags cơ bản
+        clean_content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub(r'<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub(r'<[^>]+>', ' ', clean_content)
+        clean_content = html.unescape(clean_content)
+        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+        
+        # Lấy phần đầu có ý nghĩa
+        sentences = clean_content.split('. ')
+        meaningful_content = []
+        
+        for sentence in sentences[:8]:
+            if len(sentence.strip()) > 20:
+                meaningful_content.append(sentence.strip())
+                
+        result = '. '.join(meaningful_content)
+        
+        if len(result) > 1800:
+            result = result[:1800] + "..."
+            
+        return result if result else "Không thể trích xuất nội dung từ bài viết này."
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi legacy extraction từ {url}: {e}")
+        return f"Không thể lấy nội dung chi tiết. Lỗi: {str(e)}"
+
+async def fetch_full_content_improved(url):
+    """🆕 TRÍCH XUẤT NỘI DUNG CẢI TIẾN - SỬ DỤNG 3 PHƯƠNG PHÁP"""
+    # Thử phương pháp 1: Trafilatura (tốt nhất)
+    content = await fetch_content_with_trafilatura(url)
+    if content and len(content) > 50:
+        print("✅ Thành công với Trafilatura")
+        return content
+    
+    # Thử phương pháp 2: Newspaper3k (fallback)
+    content = await fetch_content_with_newspaper(url)
+    if content and len(content) > 50:
+        print("✅ Thành công với Newspaper3k")
+        return content
+    
+    # Phương pháp 3: Legacy method (cuối cùng)
+    content = await fetch_content_legacy(url)
+    print("⚠️ Sử dụng phương pháp legacy")
+    return content
 
 async def fetch_content_with_newspaper(url):
     """📰 TRÍCH XUẤT BẰNG NEWSPAPER3K - FALLBACK"""
@@ -807,7 +959,7 @@ async def get_international_news(ctx, page=1):
 
 @bot.command(name='chitiet')
 async def get_news_detail(ctx, news_number: int):
-    """🆕 XEM CHI TIẾT BẰNG TRAFILATURA + NEWSPAPER3K"""
+    """🆕 XEM CHI TIẾT BẰNG TRAFILATURA + NEWSPAPER3K + TỰ ĐỘNG DỊCH"""
     try:
         user_id = ctx.author.id
         
@@ -834,6 +986,9 @@ async def get_news_detail(ctx, news_number: int):
         
         # Sử dụng function cải tiến
         full_content = await fetch_full_content_improved(news['link'])
+        
+        # 🌐 TÍNH NĂNG MỚI: Tự động dịch nếu là tin nước ngoài
+        translated_content, is_translated = await detect_and_translate_content(full_content, news['source'])
         
         await loading_msg.delete()
         
@@ -867,8 +1022,10 @@ async def get_news_detail(ctx, news_number: int):
         emoji = emoji_map.get(news['source'], '📰')
         source_display = source_names.get(news['source'], news['source'])
         
+        # Thêm indicator dịch thuật vào tiêu đề
+        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
         embed.add_field(
-            name=f"{emoji} Tiêu đề",
+            name=f"{emoji} Tiêu đề{title_suffix}",
             value=news['title'],
             inline=False
         )
@@ -881,16 +1038,21 @@ async def get_news_detail(ctx, news_number: int):
         
         embed.add_field(
             name="📰 Nguồn",
-            value=source_display,
+            value=source_display + (" 🌐" if is_translated else ""),
             inline=True
         )
         
+        # Sử dụng nội dung đã dịch (nếu có)
+        content_to_display = translated_content
+        
         # Hiển thị nội dung đã được xử lý
-        if len(full_content) > 1000:
+        if len(content_to_display) > 1000:
             # Chia nội dung thành 2 phần
+            content_title = "📄 Nội dung chi tiết 🌐 (Đã dịch sang tiếng Việt)" if is_translated else "📄 Nội dung chi tiết"
+            
             embed.add_field(
-                name="📄 Nội dung chi tiết (Phần 1)",
-                value=full_content[:1000] + "...",
+                name=f"{content_title} (Phần 1)",
+                value=content_to_display[:1000] + "...",
                 inline=False
             )
             
@@ -898,19 +1060,27 @@ async def get_news_detail(ctx, news_number: int):
             
             # Tạo embed thứ 2
             embed2 = discord.Embed(
-                title=f"📖 Chi tiết bài viết (tiếp theo)",
+                title=f"📖 Chi tiết bài viết (tiếp theo){'🌐' if is_translated else ''}",
                 color=0x9932cc
             )
             
             embed2.add_field(
-                name="📄 Nội dung chi tiết (Phần 2)",
-                value=full_content[1000:2000],
+                name=f"{content_title} (Phần 2)",
+                value=content_to_display[1000:2000],
                 inline=False
             )
             
+            # Thêm thông tin về bản gốc nếu đã dịch
+            if is_translated:
+                embed2.add_field(
+                    name="🔄 Thông tin dịch thuật",
+                    value="📝 Nội dung gốc bằng tiếng Anh đã được dịch sang tiếng Việt bằng Groq AI\n💡 Để xem bản gốc, vui lòng truy cập link bài viết",
+                    inline=False
+                )
+            
             embed2.add_field(
                 name="🔗 Đọc bài viết đầy đủ",
-                value=f"[Nhấn để đọc toàn bộ bài viết]({news['link']})",
+                value=f"[Nhấn để đọc toàn bộ bài viết gốc]({news['link']})",
                 inline=False
             )
             
@@ -918,21 +1088,32 @@ async def get_news_detail(ctx, news_number: int):
             tech_info = "🚀 Trafilatura" if TRAFILATURA_AVAILABLE else "📰 Legacy"
             if NEWSPAPER_AVAILABLE:
                 tech_info += " + Newspaper3k"
+            if is_translated:
+                tech_info += " + 🌐 Groq AI Translation"
             
             embed2.set_footer(text=f"{tech_info} • Từ lệnh: {user_data['command']} • Tin số {news_number}")
             
             await ctx.send(embed=embed2)
             return
         else:
+            content_title = "📄 Nội dung chi tiết 🌐 (Đã dịch sang tiếng Việt)" if is_translated else "📄 Nội dung chi tiết"
             embed.add_field(
-                name="📄 Nội dung chi tiết",
-                value=full_content,
+                name=content_title,
+                value=content_to_display,
+                inline=False
+            )
+        
+        # Thêm thông tin về dịch thuật nếu có
+        if is_translated:
+            embed.add_field(
+                name="🔄 Thông tin dịch thuật",
+                value="📝 Bài viết gốc bằng tiếng Anh đã được dịch sang tiếng Việt bằng Groq AI",
                 inline=False
             )
         
         embed.add_field(
             name="🔗 Đọc bài viết đầy đủ",
-            value=f"[Nhấn để đọc toàn bộ bài viết]({news['link']})",
+            value=f"[Nhấn để đọc toàn bộ bài viết{'gốc' if is_translated else ''}]({news['link']})",
             inline=False
         )
         
@@ -940,6 +1121,8 @@ async def get_news_detail(ctx, news_number: int):
         tech_info = "🚀 Trafilatura" if TRAFILATURA_AVAILABLE else "📰 Legacy"
         if NEWSPAPER_AVAILABLE:
             tech_info += " + Newspaper3k"
+        if is_translated:
+            tech_info += " + 🌐 Groq AI Translation"
         
         embed.set_footer(text=f"{tech_info} • Từ lệnh: {user_data['command']} • Tin số {news_number} • !menu để xem thêm lệnh")
         
@@ -971,17 +1154,15 @@ async def help_command(ctx):
 **!all [trang]** - Tin từ tất cả nguồn (12 tin/trang)
 **!in [trang]** - Tin trong nước (12 tin/trang)  
 **!out [trang]** - Tin quốc tế (12 tin/trang)
-**!chitiet [số]** - Xem nội dung chi tiết
+**!chitiet [số]** - Xem nội dung chi tiết + 🌐 Tự động dịch
         """,
         inline=False
     )
     
     embed.add_field(
-        name="🤖 Lệnh AI thông minh (MỚI)",
+        name="🤖 Lệnh AI thông minh",
         value="""
-**!giaithich [thuật ngữ]** - AI giải thích + nguồn tin đáng tin cậy
-**!explain [term]** - Alias tiếng Anh
-**!hoi [câu hỏi]** - Alias khác
+**!hoi [câu hỏi]** - AI trả lời với nguồn tin đáng tin cậy
         """,
         inline=False
     )
@@ -1001,7 +1182,7 @@ async def help_command(ctx):
     # Kiểm tra trạng thái AI services
     ai_status = ""
     if GROQ_AVAILABLE:
-        ai_status += "🚀 **Groq AI** - Giải thích thông minh ✅\n"
+        ai_status += "🚀 **Groq AI** - Giải thích + Dịch thuật thông minh ✅\n"
     else:
         ai_status += "⚠️ **Groq AI** - Chưa cấu hình\n"
     
@@ -1029,10 +1210,10 @@ async def help_command(ctx):
     embed.add_field(
         name="💡 Ví dụ sử dụng AI",
         value="""
-`!giaithich lạm phát` - Giải thích lạm phát là gì
-`!giaithich GDP` - Tìm hiểu về tổng sản phẩm quốc nội
-`!explain blockchain` - Giải thích công nghệ blockchain
-`!hoi chứng khoán là gì` - Hỏi về thị trường chứng khoán
+`!hoi lạm phát là gì` - Hỏi về lạm phát
+`!hoi GDP nghĩa là gì` - Tìm hiểu về tổng sản phẩm quốc nội
+`!hoi blockchain là gì` - Hỏi về công nghệ blockchain
+`!hoi chứng khoán hoạt động như thế nào` - Hỏi về thị trường chứng khoán
         """,
         inline=False
     )
@@ -1041,8 +1222,8 @@ async def help_command(ctx):
         name="📋 Hướng dẫn sử dụng",
         value="""
 1️⃣ **Xem tin**: Gõ **!all** để xem tin mới nhất
-2️⃣ **Chi tiết**: Gõ **!chitiet [số]** để xem nội dung đầy đủ
-3️⃣ **Giải thích**: Gõ **!giaithich [thuật ngữ]** để AI giải thích
+2️⃣ **Chi tiết**: Gõ **!chitiet [số]** - tin nước ngoài tự động dịch 🌐
+3️⃣ **Hỏi AI**: Gõ **!hoi [câu hỏi]** để AI trả lời
 4️⃣ **Phân trang**: Dùng **!all 2**, **!all 3** cho trang tiếp theo
         """,
         inline=False
@@ -1060,7 +1241,7 @@ async def help_command(ctx):
             inline=False
         )
     
-    embed.set_footer(text="🤖 Bot với AI thông minh • Múi giờ VN chính xác • Token bảo mật • Groq + Google Search")
+    embed.set_footer(text="🤖 Bot với AI thông minh • 🌐 Tự động dịch tin nước ngoài • Múi giờ VN chính xác • Groq + Google Search")
     await ctx.send(embed=embed)
 
 # Chạy bot với error handling tốt hơn
@@ -1093,7 +1274,7 @@ if __name__ == "__main__":
         
         # Thông tin AI Services
         if GROQ_AVAILABLE:
-            print("🤖 Groq AI: Sẵn sàng - AI giải thích thông minh (1000 calls/ngày)")
+            print("🤖 Groq AI: Sẵn sàng - AI giải thích + dịch thuật thông minh (1000 calls/ngày)")
         else:
             print("⚠️ Groq AI: Chưa cấu hình - Thiếu GROQ_API_KEY")
             
@@ -1103,7 +1284,8 @@ if __name__ == "__main__":
             print("⚠️ Google Search: Chưa cấu hình - Thiếu GOOGLE_API_KEY hoặc GOOGLE_CSE_ID")
         
         print("✅ Bot sẵn sàng nhận lệnh!")
-        print("💡 Lệnh mới: !giaithich [thuật ngữ] - AI giải thích với nguồn tin đáng tin cậy")
+        print("💡 Lệnh AI: !hoi [câu hỏi] - AI trả lời với nguồn tin đáng tin cậy")
+        print("🌐 Tính năng mới: !chitiet tự động dịch tin nước ngoài sang tiếng Việt")
         
         bot.run(TOKEN)
         
