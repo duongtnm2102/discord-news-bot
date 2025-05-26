@@ -1250,6 +1250,8 @@ if __name__ == "__main__":
         print("🚀 Đang khởi động News Bot cải tiến...")
 # Khởi động web server để keep alive
         keep_alive()
+        
+# ... (phần code còn lại)
         print("🔑 Đang kiểm tra token từ Environment Variables...")
         
         if TOKEN:
