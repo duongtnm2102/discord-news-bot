@@ -15,7 +15,25 @@ import pytz
 import json
 import aiohttp
 from keep_alive import keep_alive
-import google.generativeai as genai
+
+# Google Generative AI
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+    print("✅ Google Generative AI library loaded")
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("⚠️ google-generativeai library not found. Run: pip install google-generativeai")
+
+# Google API Client
+try:
+    from googleapiclient.discovery import build
+    GOOGLE_APIS_AVAILABLE = True
+    print("✅ Google API Client library loaded")
+except ImportError:
+    GOOGLE_APIS_AVAILABLE = False
+    print("⚠️ google-api-python-client library not found. Run: pip install google-api-python-client")
+
 from enum import Enum
 
 # 🆕 THÊM CÁC THỬ VIỆN NÂNG CAO (OPTIONAL)
@@ -80,16 +98,26 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# 🔒 BẢO MẬT: Environment Variables
+# 🔒 BẢO MẬT: Environment Variables với Debug
 TOKEN = os.getenv('DISCORD_TOKEN')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GOOGLE_CSE_ID = os.getenv('GOOGLE_CSE_ID')
 
-# AI API Keys
+# AI API Keys với debug logging
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY') 
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+# Debug Environment Variables
+print("🔍 DEBUGGING ENVIRONMENT VARIABLES:")
+print(f"DISCORD_TOKEN: {'✅ Found' if TOKEN else '❌ Missing'}")
+print(f"GEMINI_API_KEY: {'✅ Found' if GEMINI_API_KEY else '❌ Missing'}")
+print(f"DEEPSEEK_API_KEY: {'✅ Found' if DEEPSEEK_API_KEY else '❌ Missing'}")
+print(f"ANTHROPIC_API_KEY: {'✅ Found' if ANTHROPIC_API_KEY else '❌ Missing'}")
+print(f"GROQ_API_KEY: {'✅ Found' if GROQ_API_KEY else '❌ Missing'}")
+print(f"GOOGLE_API_KEY: {'✅ Found' if GOOGLE_API_KEY else '❌ Missing'}")
+print(f"GOOGLE_CSE_ID: {'✅ Found' if GOOGLE_CSE_ID else '❌ Missing'}")
 
 if not TOKEN:
     print("❌ CẢNH BÁO: Không tìm thấy DISCORD_TOKEN trong environment variables!")
@@ -175,40 +203,68 @@ class AIEngineManager:
         self.initialize_engines()
     
     def initialize_engines(self):
-        """Khởi tạo các AI engines theo thứ tự ưu tiên"""
+        """Khởi tạo các AI engines theo thứ tự ưu tiên với detailed debugging"""
         available_engines = []
         
+        print("\n🔧 INITIALIZING AI ENGINES:")
+        
         # Gemini - Highest priority
-        if GEMINI_API_KEY:
+        if GEMINI_API_KEY and GEMINI_AVAILABLE:
             try:
+                print(f"🔍 Testing Gemini API key (length: {len(GEMINI_API_KEY)} chars)...")
                 genai.configure(api_key=GEMINI_API_KEY)
-                available_engines.append(AIProvider.GEMINI)
-                print("✅ Gemini AI initialized - PRIMARY ENGINE")
+                
+                # Simple test instead of actual API call to avoid quota
+                if GEMINI_API_KEY.startswith('AIza') and len(GEMINI_API_KEY) > 30:
+                    available_engines.append(AIProvider.GEMINI)
+                    print("✅ Gemini AI initialized - PRIMARY ENGINE")
+                else:
+                    print("❌ Gemini API key format appears invalid")
             except Exception as e:
-                print(f"⚠️ Gemini initialization failed: {e}")
+                print(f"❌ Gemini initialization failed: {e}")
+        elif GEMINI_API_KEY and not GEMINI_AVAILABLE:
+            print("❌ GEMINI_API_KEY found but google-generativeai library not installed")
+        else:
+            print("⚠️ GEMINI_API_KEY not found in environment variables")
         
         # DeepSeek - Second priority  
         if DEEPSEEK_API_KEY:
+            print(f"🔍 DeepSeek API key found (length: {len(DEEPSEEK_API_KEY)} chars)")
             available_engines.append(AIProvider.DEEPSEEK)
             print("✅ DeepSeek AI available - FALLBACK 1")
+        else:
+            print("⚠️ DEEPSEEK_API_KEY not found in environment variables")
             
         # Claude - Third priority
         if ANTHROPIC_API_KEY:
+            print(f"🔍 Claude API key found (length: {len(ANTHROPIC_API_KEY)} chars)")
             available_engines.append(AIProvider.CLAUDE)
             print("✅ Claude AI available - FALLBACK 2")
+        else:
+            print("⚠️ ANTHROPIC_API_KEY not found in environment variables")
             
         # Groq - Last fallback
         if GROQ_API_KEY:
+            print(f"🔍 Groq API key found (length: {len(GROQ_API_KEY)} chars)")
             available_engines.append(AIProvider.GROQ)
             print("✅ Groq AI available - LAST FALLBACK")
+        else:
+            print("⚠️ GROQ_API_KEY not found in environment variables")
         
         if available_engines:
             self.primary_ai = available_engines[0]
             self.fallback_ais = available_engines[1:]
-            print(f"🚀 Primary AI: {self.primary_ai.value}")
-            print(f"🛡️ Fallback AIs: {[ai.value for ai in self.fallback_ais]}")
+            print(f"\n🚀 PRIMARY AI: {self.primary_ai.value.upper()}")
+            if self.fallback_ais:
+                print(f"🛡️ FALLBACK AIs: {[ai.value.upper() for ai in self.fallback_ais]}")
+            print(f"📊 Total AI engines: {len(available_engines)}")
         else:
-            print("❌ No AI engines available!")
+            print("\n❌ NO AI ENGINES AVAILABLE!")
+            print("💡 To fix this, add at least one of these API keys to Environment Variables:")
+            print("   - GEMINI_API_KEY (Recommended - Free)")
+            print("   - DEEPSEEK_API_KEY (Cheap)")
+            print("   - ANTHROPIC_API_KEY (Reliable)")
+            print("   - GROQ_API_KEY (Fast)")
             self.primary_ai = None
 
     async def call_ai_with_fallback(self, prompt, context="", require_specific_data=True):
@@ -253,6 +309,9 @@ class AIEngineManager:
 
     async def _call_gemini(self, prompt, context, require_specific_data):
         """🚀 Gemini 2.5 Flash - RECOMMENDED"""
+        
+        if not GEMINI_AVAILABLE:
+            raise Exception("Gemini library not available")
         
         # Tạo prompt siêu nghiêm khắc cho Gemini
         system_prompt = """BẠN LÀ CHUYÊN GIA TÀI CHÍNH VIỆT NAM. QUY TẮC NGHIÊM NGẶT:
@@ -411,6 +470,10 @@ async def search_reliable_sources_improved(query, max_results=5):
         print("⚠️ Google Search API not configured")
         return []
     
+    if not GOOGLE_APIS_AVAILABLE:
+        print("⚠️ Google API Client library not available")
+        return []
+    
     try:
         # Thêm time context cho query
         current_date = datetime.now(VN_TIMEZONE).strftime("%Y")
@@ -421,7 +484,6 @@ async def search_reliable_sources_improved(query, max_results=5):
         
         print(f"🔍 Enhanced search query: {enhanced_query}")
         
-        from googleapiclient.discovery import build
         service = build("customsearch", "v1", developerKey=GOOGLE_API_KEY)
         
         result = service.cse().list(
