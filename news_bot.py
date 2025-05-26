@@ -10,15 +10,20 @@ import time
 from urllib.parse import urljoin
 import html
 import chardet
-from keep_alive import keep_alive
 
 # Cấu hình bot
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Token từ environment variable (bảo mật hơn cho cloud deployment)
-TOKEN = os.getenv('DISCORD_TOKEN', 'MTM3NjE4NTQ2MzQ1ODYzMTc1MQ.GdtJmP.BOIZAf0SzidWwxpjCFc8yJtKgyUf1ou4gZhlaI')
+# 🔒 BẢO MẬT: Lấy token từ environment variable
+# KHÔNG BAO GIỜ hardcode token trong code nữa!
+TOKEN = os.getenv('DISCORD_TOKEN')
+
+if not TOKEN:
+    print("❌ CẢNH BÁO: Không tìm thấy DISCORD_TOKEN trong environment variables!")
+    print("🔧 Vui lòng thêm DISCORD_TOKEN vào Render Environment Variables")
+    exit(1)
 
 # Lưu trữ tin tức theo từng user để xem chi tiết
 user_news_cache = {}
@@ -84,7 +89,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching, 
-            name="tin kinh tế đã kiểm tra | !menu"
+            name="tin kinh tế bảo mật | !menu"
         )
     )
 
@@ -373,7 +378,7 @@ async def get_all_news(ctx, page=1):
         # Tạo embed với thiết kế tốt hơn
         embed = discord.Embed(
             title=f"📰 Tin tức kinh tế tổng hợp (Trang {page})",
-            description=f"Cập nhật từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn tin uy tín",
+            description=f"🔒 Bot bảo mật • Cập nhật từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn tin uy tín",
             color=0x00ff88,
             timestamp=ctx.message.created_at
         )
@@ -429,7 +434,7 @@ async def get_all_news(ctx, page=1):
         
         # Footer
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"Trang {page}/{total_pages} • !all {page+1} cho trang tiếp • !chitiet [số] xem chi tiết")
+        embed.set_footer(text=f"🔒 Bot bảo mật • Trang {page}/{total_pages} • !all {page+1} tiếp • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -463,7 +468,7 @@ async def get_domestic_news(ctx, page=1):
         
         embed = discord.Embed(
             title=f"🇻🇳 Tin kinh tế trong nước (Trang {page})",
-            description=f"Từ {len(RSS_FEEDS['domestic'])} nguồn tin chuyên ngành Việt Nam",
+            description=f"🔒 Bot bảo mật • Từ {len(RSS_FEEDS['domestic'])} nguồn tin chuyên ngành Việt Nam",
             color=0xff0000,
             timestamp=ctx.message.created_at
         )
@@ -505,7 +510,7 @@ async def get_domestic_news(ctx, page=1):
         save_user_news(ctx.author.id, page_news, f"in_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"Trang {page}/{total_pages} • !in {page+1} tiếp theo • !chitiet [số] xem chi tiết")
+        embed.set_footer(text=f"🔒 Bot bảo mật • Trang {page}/{total_pages} • !in {page+1} tiếp • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -537,7 +542,7 @@ async def get_international_news(ctx, page=1):
         
         embed = discord.Embed(
             title=f"🌍 Tin kinh tế quốc tế (Trang {page})",
-            description=f"Từ {len(RSS_FEEDS['international'])} nguồn tin hàng đầu thế giới",
+            description=f"🔒 Bot bảo mật • Từ {len(RSS_FEEDS['international'])} nguồn tin hàng đầu thế giới",
             color=0x0066ff,
             timestamp=ctx.message.created_at
         )
@@ -573,7 +578,7 @@ async def get_international_news(ctx, page=1):
         save_user_news(ctx.author.id, page_news, f"out_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"Trang {page}/{total_pages} • !out {page+1} tiếp theo • !chitiet [số] xem chi tiết")
+        embed.set_footer(text=f"🔒 Bot bảo mật • Trang {page}/{total_pages} • !out {page+1} tiếp • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -684,7 +689,7 @@ async def get_news_detail(ctx, news_number: int):
                 inline=False
             )
             
-            embed2.set_footer(text=f"Từ lệnh: {user_data['command']} • Tin số {news_number}")
+            embed2.set_footer(text=f"🔒 Bot bảo mật • Từ lệnh: {user_data['command']} • Tin số {news_number}")
             
             await ctx.send(embed=embed2)
             return
@@ -701,7 +706,7 @@ async def get_news_detail(ctx, news_number: int):
             inline=False
         )
         
-        embed.set_footer(text=f"Từ lệnh: {user_data['command']} • Tin số {news_number} • !menu để xem thêm lệnh")
+        embed.set_footer(text=f"🔒 Bot bảo mật • Từ lệnh: {user_data['command']} • Tin số {news_number} • !menu để xem thêm lệnh")
         
         await ctx.send(embed=embed)
         
@@ -718,10 +723,10 @@ async def get_news_detail_alias(ctx, news_number: int):
 
 @bot.command(name='menu')
 async def help_command(ctx):
-    """Hiển thị menu lệnh - ĐÃ CẬP NHẬT"""
+    """Hiển thị menu lệnh - ĐÃ CẬP NHẬT BẢO MẬT"""
     embed = discord.Embed(
-        title="🤖 Menu News Bot - Kinh tế chuyên ngành",
-        description="Bot tin tức kinh tế đã được tối ưu và sửa lỗi",
+        title="🤖🔒 Menu News Bot - Bảo mật & Ổn định",
+        description="Bot tin tức kinh tế đã được tối ưu và bảo mật token",
         color=0xff9900
     )
     
@@ -731,7 +736,7 @@ async def help_command(ctx):
 **!all [trang]** - Tin từ tất cả nguồn (12 tin/trang)
 **!in [trang]** - Tin trong nước (12 tin/trang)  
 **!out [trang]** - Tin quốc tế (12 tin/trang)
-**!chitiet [số]** - Xem nội dung chi tiết (đã sửa lỗi encoding)
+**!chitiet [số]** - Xem nội dung chi tiết
         """,
         inline=False
     )
@@ -749,12 +754,12 @@ async def help_command(ctx):
     )
     
     embed.add_field(
-        name="🔧 Cải tiến mới",
+        name="🔒 Bảo mật mới",
         value="""
-✅ **Sửa lỗi RSS feeds** - Chỉ dùng nguồn đã kiểm tra
-✅ **Sửa lỗi encoding** - Nội dung chi tiết không còn bị lỗi font
-✅ **Giao diện đẹp hơn** - Embed hiện đại, dễ đọc
-✅ **Tốc độ nhanh hơn** - Tối ưu xử lý RSS
+✅ **Token được bảo vệ** - Sử dụng Environment Variables
+✅ **Không hardcode** - Token không còn trong source code
+✅ **Deploy an toàn** - Không bị Discord reset token
+✅ **Monitoring tích hợp** - Phát hiện lỗi nhanh chóng
         """,
         inline=False
     )
@@ -770,36 +775,35 @@ async def help_command(ctx):
         inline=False
     )
     
-    embed.set_footer(text="Bot đã được tối ưu • RSS feeds đã kiểm tra • Lỗi encoding đã sửa")
+    embed.set_footer(text="🔒 Bot đã được bảo mật • Token an toàn • RSS feeds ổn định")
     await ctx.send(embed=embed)
-
-# Chạy keep-alive và bot
-if __name__ == "__main__":
-    keep_alive()  # Bật web server
-    bot.run(TOKEN)
 
 # Chạy bot với error handling tốt hơn
 if __name__ == "__main__":
     try:
-        print("🚀 Đang khởi động News Bot đã tối ưu...")
-        print("🔑 Token Discord sẵn sàng")
+        print("🚀 Đang khởi động News Bot bảo mật...")
+        print("🔑 Đang kiểm tra token từ Environment Variables...")
+        
+        if TOKEN:
+            print("✅ Token đã được tải từ Environment Variables")
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
         print(f"📊 Đã load {total_sources} nguồn RSS ĐÃ KIỂM TRA")
         print(f"🇻🇳 Trong nước: {len(RSS_FEEDS['domestic'])} nguồn")
         print(f"🌍 Quốc tế: {len(RSS_FEEDS['international'])} nguồn")
         print("🎯 Lĩnh vực: Kinh tế, Chứng khoán, Vĩ mô, Bất động sản")
-        print("✅ Đã sửa lỗi encoding và RSS feeds")
+        print("🔒 Bot đã được bảo mật token")
         print("✅ Bot sẵn sàng nhận lệnh!")
         
         bot.run(TOKEN)
         
     except discord.LoginFailure:
         print("❌ Lỗi đăng nhập Discord!")
-        print("🔧 Kiểm tra token hoặc quyền bot")
+        print("🔧 Token có thể không hợp lệ hoặc đã bị reset")
+        print("🔧 Kiểm tra DISCORD_TOKEN trong Environment Variables")
         
     except Exception as e:
         print(f"❌ Lỗi khi chạy bot: {e}")
-        print("🔧 Kiểm tra kết nối internet và thư viện đã cài đặt")
+        print("🔧 Kiểm tra kết nối internet và Environment Variables")
         
     input("Nhấn Enter để thoát...")
