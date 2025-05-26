@@ -1,14 +1,38 @@
+# Discord News Bot - Multi-AI Engine Requirements
+# Core Discord & Web
 discord.py==2.3.2
 feedparser==6.0.11
 requests==2.31.0
 flask==2.3.3
 python-dateutil==2.8.2
+
+# Content Extraction (existing)
 chardet==5.2.0
 urllib3==2.1.0
 beautifulsoup4==4.12.2
-lxml>=4.9.4
-trafilatura>=1.6.0
-newspaper3k==0.2.8
+lxml==4.9.3
+
+# 🆕 MULTI-AI ENGINE DEPENDENCIES
+# Google Gemini AI
+google-generativeai==0.3.2
+
+# Async HTTP for API calls
+aiohttp==3.9.1
+
+# Google APIs (Search & AI Studio)
+google-api-python-client==2.108.0
+google-auth-httplib2==0.1.1
+google-auth-oauthlib==1.1.0
+
+# Date & Time handling
 pytz==2023.3
-groq>=0.4.0
-google-api-python-client==2.110.0
+
+# Optional: Advanced content extraction (if you want to keep Trafilatura)
+# trafilatura==1.6.3
+# newspaper3k==0.2.8
+
+# Optional: Async support enhancement
+# asyncio==3.4.3  # Usually built-in, but some environments need it
+
+# JSON handling (usually built-in)
+# json5==0.9.14  # Enhanced JSON parsing if needed
