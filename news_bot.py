@@ -1824,34 +1824,6 @@ async def help_command_fixed(ctx):
         value="Yahoo Finance, Reuters, Bloomberg, MarketWatch, Forbes, Financial Times, Business Insider, The Economist",
         inline=True
     )
-
-    # Kiểm tra trạng thái AI services
-    ai_status = ""
-    if GROQ_AVAILABLE and groq_client:
-        ai_status += "🚀 **Groq AI** - Giải thích + Dịch thuật thông minh ✅\n"
-    else:
-        ai_status += "ℹ️ **Groq AI** - Chưa cấu hình (cần GROQ_API_KEY)\n"
-    
-    if GOOGLE_SEARCH_AVAILABLE and google_search_service:
-        ai_status += "🔍 **Google Search** - Tìm nguồn tin đáng tin cậy ✅\n"
-    else:
-        ai_status += "ℹ️ **Google Search** - Chưa cấu hình (cần API keys)\n"
-    
-    if TRAFILATURA_AVAILABLE:
-        ai_status += "🚀 **Trafilatura** - Trích xuất nội dung cải tiến ✅\n"
-    else:
-        ai_status += "📰 **Legacy Extraction** - Phương pháp cơ bản ✅\n"
-    
-    if NEWSPAPER_AVAILABLE:
-        ai_status += "📰 **Newspaper3k** - Fallback extraction ✅"
-    else:
-        ai_status = ai_status.rstrip('\n')  # Remove trailing newline
-    
-    embed.add_field(
-        name="🚀 Công nghệ tích hợp",
-        value=ai_status,
-        inline=False
-    )
     
     # Fixed features details
     fixed_features = f"✅ **Claude API 400 Error** - Message validation\n"
