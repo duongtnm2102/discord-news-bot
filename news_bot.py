@@ -19,6 +19,24 @@ from enum import Enum
 from typing import List, Dict, Tuple, Optional
 import random
 
+# 🆕 THÊM CÁC THỬ VIỆN NÂNG CAO (OPTIONAL)
+try:
+    import trafilatura
+    TRAFILATURA_AVAILABLE = True
+    print("✅ Trafilatura đã được tích hợp - Trích xuất nội dung cải tiến!")
+except ImportError:
+    TRAFILATURA_AVAILABLE = False
+    print("⚠️ Trafilatura không có sẵn - Sẽ dùng phương pháp cơ bản")
+
+try:
+    import newspaper
+    from newspaper import Article
+    NEWSPAPER_AVAILABLE = True
+    print("✅ Newspaper3k đã được tích hợp - Fallback extraction!")
+except ImportError:
+    NEWSPAPER_AVAILABLE = False
+    print("⚠️ Newspaper3k không có sẵn - Sẽ dùng phương pháp cơ bản")
+    
 # Google Generative AI
 try:
     import google.generativeai as genai
@@ -986,87 +1004,212 @@ QUAN TRỌNG: Phải có SỐ LIỆU CỤ THỂ và NGUỒN TIN trong câu trả
 debate_engine = MultiAIDebateEngine()
 
 # Content extraction and RSS functions (FIXED with full feeds)
-async def fetch_full_content_improved(url):
+async def fetch_content_with_trafilatura(url):
+    """🆕 TRÍCH XUẤT NỘI DUNG BẰNG TRAFILATURA - TỐT NHẤT 2024"""
+    try:
+        if not TRAFILATURA_AVAILABLE:
+            return None
+        
+        print(f"🚀 Sử dụng Trafilatura cho: {url}")
+        
+        # Tải nội dung
+        downloaded = trafilatura.fetch_url(url)
+        if not downloaded:
+            return None
+        
+        # Trích xuất với metadata
+        result = trafilatura.bare_extraction(
+            downloaded,
+            include_comments=False,
+            include_tables=True,
+            include_links=False,
+            with_metadata=True
+        )
+        
+        if result and result.get('text'):
+            content = result['text']
+            
+            # Giới hạn độ dài và làm sạch
+            if len(content) > 2000:
+                content = content[:2000] + "..."
+            
+            return content.strip()
+        
+        return None
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi Trafilatura cho {url}: {e}")
+        return None
+
+async def fetch_content_with_newspaper(url):
+    """📰 TRÍCH XUẤT BẰNG NEWSPAPER3K - FALLBACK"""
+    try:
+        if not NEWSPAPER_AVAILABLE:
+            return None
+        
+        print(f"📰 Sử dụng Newspaper3k cho: {url}")
+        
+        # Tạo article object
+        article = Article(url)
+        article.download()
+        article.parse()
+        
+        if article.text:
+            content = article.text
+            
+            # Giới hạn độ dài
+            if len(content) > 2000:
+                content = content[:2000] + "..."
+            
+            return content.strip()
+        
+        return None
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi Newspaper3k cho {url}: {e}")
+        return None
+
+async def fetch_content_legacy(url):
+    """🔄 PHƯƠNG PHÁP CŨ - CUỐI CÙNG FALLBACK"""
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
         
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=8, stream=True)
         response.raise_for_status()
         
-        content = response.text
-        content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<style[^>]*>.*?</style>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'<[^>]+>', ' ', content)
-        content = html.unescape(content)
-        content = re.sub(r'\s+', ' ', content).strip()
+        # Xử lý encoding
+        raw_content = response.content
+        detected = chardet.detect(raw_content)
+        encoding = detected['encoding'] or 'utf-8'
         
-        sentences = content.split('. ')
+        try:
+            content = raw_content.decode(encoding)
+        except:
+            content = raw_content.decode('utf-8', errors='ignore')
+        
+        # Loại bỏ HTML tags cơ bản
+        clean_content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub(r'<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub(r'<[^>]+>', ' ', clean_content)
+        clean_content = html.unescape(clean_content)
+        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+        
+        # Lấy phần đầu có ý nghĩa
+        sentences = clean_content.split('. ')
         meaningful_content = []
         
         for sentence in sentences[:8]:
             if len(sentence.strip()) > 20:
                 meaningful_content.append(sentence.strip())
-        
+                
         result = '. '.join(meaningful_content)
-        return result[:1500] + "..." if len(result) > 1500 else result
+        
+        if len(result) > 1800:
+            result = result[:1800] + "..."
+            
+        return result if result else "Không thể trích xuất nội dung từ bài viết này."
         
     except Exception as e:
-        print(f"⚠️ Content extraction error: {e}")
-        return "Không thể trích xuất nội dung từ bài viết này."
+        print(f"⚠️ Lỗi legacy extraction từ {url}: {e}")
+        return f"Không thể lấy nội dung chi tiết. Lỗi: {str(e)}"
 
-async def collect_news_from_sources(sources_dict, limit_per_source=6):
-    """🔧 FIXED: Collect news with full RSS feeds"""
-    all_news = []
+async def fetch_full_content_improved(url):
+    """🆕 TRÍCH XUẤT NỘI DUNG CẢI TIẾN - SỬ DỤNG 3 PHƯƠNG PHÁP"""
+    # Thử phương pháp 1: Trafilatura (tốt nhất)
+    content = await fetch_content_with_trafilatura(url)
+    if content and len(content) > 50:
+        print("✅ Thành công với Trafilatura")
+        return content
     
-    print(f"📊 FIXED: Collecting from {len(sources_dict)} sources")
+    # Thử phương pháp 2: Newspaper3k (fallback)
+    content = await fetch_content_with_newspaper(url)
+    if content and len(content) > 50:
+        print("✅ Thành công với Newspaper3k")
+        return content
+    
+    # Phương pháp 3: Legacy method (cuối cùng)
+    content = await fetch_content_legacy(url)
+    print("⚠️ Sử dụng phương pháp legacy")
+    return content
+
+async def collect_news_from_sources(sources_dict, limit_per_source=8):
+    """Thu thập tin tức với xử lý múi giờ chính xác"""
+    all_news = []
     
     for source_name, rss_url in sources_dict.items():
         try:
-            print(f"🔄 Fetching from {source_name}...")
+            print(f"🔄 Đang lấy tin từ {source_name}...")
             
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            response = requests.get(rss_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            feed = feedparser.parse(response.content)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/rss+xml, application/xml, text/xml',
+                'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8'
+            }
+            
+            try:
+                response = requests.get(rss_url, headers=headers, timeout=10)
+                response.raise_for_status()
+                feed = feedparser.parse(response.content)
+            except Exception as req_error:
+                print(f"⚠️ Lỗi request từ {source_name}: {req_error}")
+                feed = feedparser.parse(rss_url)
             
             if not hasattr(feed, 'entries') or len(feed.entries) == 0:
-                print(f"⚠️ No entries from {source_name}")
+                print(f"⚠️ Không có tin từ {source_name}")
                 continue
                 
             entries_processed = 0
             for entry in feed.entries[:limit_per_source]:
                 try:
-                    vn_time = datetime.now(VN_TIMEZONE)
+                    # 🔧 XỬ LÝ THỜI GIAN CHÍNH XÁC
+                    vn_time = datetime.now(VN_TIMEZONE)  # Default fallback
                     
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         vn_time = convert_utc_to_vietnam_time(entry.published_parsed)
+                    elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
+                        vn_time = convert_utc_to_vietnam_time(entry.updated_parsed)
                     
+                    # Lấy mô tả
                     description = ""
                     if hasattr(entry, 'summary'):
-                        description = entry.summary[:400] + "..." if len(entry.summary) > 400 else entry.summary
+                        description = entry.summary[:500] + "..." if len(entry.summary) > 500 else entry.summary
+                    elif hasattr(entry, 'description'):
+                        description = entry.description[:500] + "..." if len(entry.description) > 500 else entry.description
                     
-                    if hasattr(entry, 'title') and hasattr(entry, 'link'):
-                        news_item = {
-                            'title': html.unescape(entry.title.strip()),
-                            'link': entry.link,
-                            'source': source_name,
-                            'published': vn_time,
-                            'published_str': vn_time.strftime("%H:%M %d/%m"),
-                            'description': html.unescape(description) if description else ""
-                        }
-                        all_news.append(news_item)
-                        entries_processed += 1
+                    if not hasattr(entry, 'title') or not hasattr(entry, 'link'):
+                        continue
                     
-                except Exception:
+                    title = html.unescape(entry.title.strip())
+                    
+                    news_item = {
+                        'title': title,
+                        'link': entry.link,
+                        'source': source_name,
+                        'published': vn_time,
+                        'published_str': vn_time.strftime("%H:%M %d/%m"),
+                        'description': html.unescape(description) if description else ""
+                    }
+                    all_news.append(news_item)
+                    entries_processed += 1
+                    
+                except Exception as entry_error:
+                    print(f"⚠️ Lỗi xử lý tin từ {source_name}: {entry_error}")
                     continue
                     
-            print(f"✅ Got {entries_processed} news from {source_name}")
+            print(f"✅ Lấy được {entries_processed} tin từ {source_name}")
             
         except Exception as e:
-            print(f"❌ Error from {source_name}: {e}")
+            print(f"❌ Lỗi khi lấy tin từ {source_name}: {e}")
             continue
+    
+    print(f"📊 Tổng cộng lấy được {len(all_news)} tin từ tất cả nguồn")
     
     # Remove duplicates
     unique_news = []
@@ -1122,6 +1265,66 @@ async def on_ready():
         )
     )
 
+async def detect_and_translate_content(content, source_name):
+    """🌐 PHÁT HIỆN VÀ DỊCH NỘI DUNG TIẾNG ANH SANG TIẾNG VIỆT"""
+    try:
+        # Danh sách nguồn tin nước ngoài (tiếng Anh)
+        international_sources = {
+            'yahoo_finance', 'reuters_business', 'bloomberg_markets', 'marketwatch_latest',
+            'forbes_money', 'financial_times', 'business_insider', 'the_economist'
+        }
+        
+        # Chỉ dịch nếu là nguồn nước ngoài và có Groq AI
+        if source_name not in international_sources or not GROQ_AVAILABLE or not groq_client:
+            return content, False
+        
+        # Kiểm tra nếu nội dung có vẻ là tiếng Anh
+        english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 'will', 'would', 'could', 'should']
+        content_lower = content.lower()
+        english_word_count = sum(1 for word in english_indicators if word in content_lower)
+        
+        # Nếu có ít nhất 3 từ tiếng Anh thông dụng thì tiến hành dịch
+        if english_word_count < 3:
+            return content, False
+        
+        print(f"🌐 Đang dịch nội dung từ {source_name} sang tiếng Việt...")
+        
+        # Tạo prompt dịch thuật chuyên nghiệp
+        translation_prompt = f"""Bạn là một chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
+
+YÊU CẦU DỊCH:
+1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
+2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
+3. Dịch tự nhiên, không máy móc
+4. Giữ nguyên các con số, tỷ lệ phần trăm
+5. Không thêm giải thích hay bình luận
+
+ĐOẠN VĂN CẦN DỊCH:
+{content}
+
+BẢN DỊCH TIẾNG VIỆT:"""
+
+        # Gọi Groq AI để dịch
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": translation_prompt
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.1,  # Ít creativity để dịch chính xác
+            max_tokens=2000
+        )
+        
+        translated_content = chat_completion.choices[0].message.content.strip()
+        print("✅ Dịch thuật thành công")
+        return translated_content, True
+        
+    except Exception as e:
+        print(f"⚠️ Lỗi dịch thuật: {e}")
+        return content, False
+        
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
@@ -1462,6 +1665,8 @@ async def get_news_detail_fixed(ctx, news_number: int):
         loading_msg = await ctx.send("⏳ Đang trích xuất nội dung (FIXED)...")
         
         full_content = await fetch_full_content_improved(news['link'])
+
+        translated_content, is_translated = await detect_and_translate_content(full_content, news['source'])
         
         await loading_msg.delete()
         
@@ -1469,13 +1674,98 @@ async def get_news_detail_fixed(ctx, news_number: int):
             title="📖 Chi tiết bài viết - FIXED",
             color=0x9932cc
         )
-        
+         # Thêm indicator dịch thuật vào tiêu đề
+        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
         embed.add_field(name="📰 Tiêu đề", value=news['title'], inline=False)
         embed.add_field(name="🕰️ Thời gian", value=news['published_str'], inline=True)
         embed.add_field(name="📄 Nội dung", value=full_content[:1000] + ("..." if len(full_content) > 1000 else ""), inline=False)
         embed.add_field(name="🔗 Đọc đầy đủ", value=f"[Nhấn để đọc]({news['link']})", inline=False)
         
         embed.set_footer(text=f"🔧 FIXED v2.0 • !hoi [câu hỏi] để hỏi AI về bài viết này")
+        
+        # Sử dụng nội dung đã dịch (nếu có)
+        content_to_display = translated_content
+        
+        # Hiển thị nội dung đã được xử lý
+        if len(content_to_display) > 1000:
+            # Chia nội dung thành 2 phần
+            content_title = "📄 Nội dung chi tiết 🌐 (Đã dịch sang tiếng Việt)" if is_translated else "📄 Nội dung chi tiết"
+            
+            embed.add_field(
+                name=f"{content_title} (Phần 1)",
+                value=content_to_display[:1000] + "...",
+                inline=False
+            )
+            
+            await ctx.send(embed=embed)
+            
+            # Tạo embed thứ 2
+            embed2 = discord.Embed(
+                title=f"📖 Chi tiết bài viết (tiếp theo){'🌐' if is_translated else ''}",
+                color=0x9932cc
+            )
+            
+            embed2.add_field(
+                name=f"{content_title} (Phần 2)",
+                value=content_to_display[1000:2000],
+                inline=False
+            )
+            
+            # Thêm thông tin về bản gốc nếu đã dịch
+            if is_translated:
+                embed2.add_field(
+                    name="🔄 Thông tin dịch thuật",
+                    value="📝 Nội dung gốc bằng tiếng Anh đã được dịch sang tiếng Việt bằng Groq AI\n💡 Để xem bản gốc, vui lòng truy cập link bài viết",
+                    inline=False
+                )
+            
+            embed2.add_field(
+                name="🔗 Đọc bài viết đầy đủ",
+                value=f"[Nhấn để đọc toàn bộ bài viết gốc]({news['link']})",
+                inline=False
+            )
+            
+            # Thông tin công nghệ sử dụng
+            tech_info = "🚀 Trafilatura" if TRAFILATURA_AVAILABLE else "📰 Legacy"
+            if NEWSPAPER_AVAILABLE:
+                tech_info += " + Newspaper3k"
+            if is_translated:
+                tech_info += " + 🌐 Groq AI Translation"
+            
+            embed2.set_footer(text=f"{tech_info} • Từ lệnh: {user_data['command']} • Tin số {news_number}")
+            
+            await ctx.send(embed=embed2)
+            return
+        else:
+            content_title = "📄 Nội dung chi tiết 🌐 (Đã dịch sang tiếng Việt)" if is_translated else "📄 Nội dung chi tiết"
+            embed.add_field(
+                name=content_title,
+                value=content_to_display,
+                inline=False
+            )
+        
+        # Thêm thông tin về dịch thuật nếu có
+        if is_translated:
+            embed.add_field(
+                name="🔄 Thông tin dịch thuật",
+                value="📝 Bài viết gốc bằng tiếng Anh đã được dịch sang tiếng Việt bằng Groq AI",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="🔗 Đọc bài viết đầy đủ",
+            value=f"[Nhấn để đọc toàn bộ bài viết{'gốc' if is_translated else ''}]({news['link']})",
+            inline=False
+        )
+        
+        # Thông tin công nghệ sử dụng
+        tech_info = "🚀 Trafilatura" if TRAFILATURA_AVAILABLE else "📰 Legacy"
+        if NEWSPAPER_AVAILABLE:
+            tech_info += " + Newspaper3k"
+        if is_translated:
+            tech_info += " + 🌐 Groq AI Translation"
+        
+        embed.set_footer(text=f"{tech_info} • Từ lệnh: {user_data['command']} • Tin số {news_number} • !menu để xem thêm lệnh")
         
         await ctx.send(embed=embed)
         
@@ -1533,6 +1823,34 @@ async def help_command_fixed(ctx):
         name="🌍 Nguồn quốc tế FIXED (8 nguồn)",
         value="Yahoo Finance, Reuters, Bloomberg, MarketWatch, Forbes, Financial Times, Business Insider, The Economist",
         inline=True
+    )
+
+    # Kiểm tra trạng thái AI services
+    ai_status = ""
+    if GROQ_AVAILABLE and groq_client:
+        ai_status += "🚀 **Groq AI** - Giải thích + Dịch thuật thông minh ✅\n"
+    else:
+        ai_status += "ℹ️ **Groq AI** - Chưa cấu hình (cần GROQ_API_KEY)\n"
+    
+    if GOOGLE_SEARCH_AVAILABLE and google_search_service:
+        ai_status += "🔍 **Google Search** - Tìm nguồn tin đáng tin cậy ✅\n"
+    else:
+        ai_status += "ℹ️ **Google Search** - Chưa cấu hình (cần API keys)\n"
+    
+    if TRAFILATURA_AVAILABLE:
+        ai_status += "🚀 **Trafilatura** - Trích xuất nội dung cải tiến ✅\n"
+    else:
+        ai_status += "📰 **Legacy Extraction** - Phương pháp cơ bản ✅\n"
+    
+    if NEWSPAPER_AVAILABLE:
+        ai_status += "📰 **Newspaper3k** - Fallback extraction ✅"
+    else:
+        ai_status = ai_status.rstrip('\n')  # Remove trailing newline
+    
+    embed.add_field(
+        name="🚀 Công nghệ tích hợp",
+        value=ai_status,
+        inline=False
     )
     
     # Fixed features details
