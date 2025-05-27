@@ -73,6 +73,19 @@ jsonschema==4.23.0
 # 🆕 ADDED: Retry logic for AI API failures
 tenacity==9.0.0
 
+# ===== OPTIONAL PERFORMANCE BOOSTERS =====
+# 🆕 OPTIONAL: HTTP/2 support for faster AI API calls
+# Uncomment if you want HTTP/2 performance boost:
+httpx==0.27.0
+
+# 🆕 OPTIONAL: Faster JSON parsing for AI responses
+# Uncomment if processing large AI responses:
+orjson==3.10.3
+
+# 🆕 OPTIONAL: Memory-efficient async operations
+# Uncomment for high-load scenarios:
+uvloop==0.19.0  # Linux/Mac only - 40% faster event loop
+
 # ✅ REMOVED: concurrent.futures is built-in Python 3.2+ module
 # No separate package needed
 
