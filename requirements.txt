@@ -95,8 +95,8 @@ gunicorn==22.0.0
 # ===== OPTIONAL AI LIBRARIES (FOR FUTURE EXTENSIONS) =====
 # 🆕 ADDED: Support for more content extraction methods
 # Uncomment if needed:
-# trafilatura==1.12.2
-# newspaper3k==0.2.8
+trafilatura==1.12.2
+newspaper3k==0.2.8
 
 # ===== PERFORMANCE & MONITORING =====
 # 🆕 ADDED: Memory monitoring for multi-AI operations
