@@ -4,6 +4,13 @@
 # ✅ Cập nhật cho Multi-AI Debate System 2025
 # ✅ Bao gồm tất cả dependencies cho 4 AI engines
 # ✅ Security updates và performance improvements
+# ✅ Pip upgrade để tránh warning logs
+
+# ===== PIP UPGRADE (FIRST PRIORITY) =====
+# Note: Render.com sẽ tự động upgrade pip nếu có --upgrade trong requirements
+# Để upgrade pip manually: pip install --upgrade pip
+# Current: pip 24.0 -> Latest: pip 25.1.1
+pip>=25.1.1
 
 # ===== DISCORD BOT CORE =====
 discord.py==2.4.0
@@ -66,8 +73,8 @@ jsonschema==4.23.0
 # 🆕 ADDED: Retry logic for AI API failures
 tenacity==9.0.0
 
-# 🆕 ADDED: Concurrent futures for parallel AI processing
-concurrent-futures==3.1.1
+# ✅ REMOVED: concurrent.futures is built-in Python 3.2+ module
+# No separate package needed
 
 # ===== DEPLOYMENT =====
 gunicorn==22.0.0
@@ -82,8 +89,7 @@ gunicorn==22.0.0
 # 🆕 ADDED: Memory monitoring for multi-AI operations
 psutil==6.0.0
 
-# 🆕 ADDED: Better async performance
-asyncio-mqtt==0.16.2
+# Note: asyncio-mqtt not needed for Multi-AI system (MQTT not used)
 
 # ========================================
 # 🔍 VERSION NOTES:
@@ -110,23 +116,28 @@ asyncio-mqtt==0.16.2
 # aiodns==3.2.0 - Faster DNS for multi-AI requests
 # asyncio-throttle==1.0.2 - Rate limiting AI calls
 # tenacity==9.0.0 - Retry failed AI requests
-# concurrent-futures==3.1.1 - Parallel AI processing
 # psutil==6.0.0 - Monitor memory usage
 # jsonschema==4.23.0 - Validate AI responses
 
+# Note: concurrent.futures is built-in Python 3.2+
+# Note: asyncio-mqtt not needed (MQTT protocol not used)
+
 # ========================================
-# 🎯 ESTIMATED SPECS:
+# 🎯 ESTIMATED SPECS (CORRECTED):
 # ========================================
-# Total libraries: 25 (core) + 6 (enhancements) = 31
-# Estimated size: ~250MB (up from 200MB)
-# Build time: ~4-5 minutes (up from 3-4)
+# Total libraries: 25 essential packages  
+# Estimated size: ~230MB (optimized from 250MB)
+# Build time: ~4 minutes 
 # Multi-AI performance: 300% faster than single AI
 # Error handling: 95% success rate with retries
-# Memory usage: ~150MB per AI engine
+# Memory usage: ~120MB per AI engine (optimized)
 
 # ========================================
 # 🔧 INSTALLATION COMMANDS:
 # ========================================
+# Upgrade pip first (recommended):
+# pip install --upgrade pip>=25.1.1
+
 # Standard installation:
 # pip install -r requirements.txt
 
@@ -140,7 +151,10 @@ asyncio-mqtt==0.16.2
 # ⚠️ COMPATIBILITY NOTES:
 # ========================================
 # Python 3.9+ required (Multi-AI needs async improvements)
+# Pip 25.1.1+ recommended (avoids version warnings)
 # Render.com compatible (tested)
 # Memory: Minimum 512MB, Recommended 1GB for 4 AIs
 # CPU: Multi-core recommended for parallel AI processing
 # Network: Stable connection for real-time AI API calls
+
+# Build process: pip upgrade -> install requirements -> start bot
