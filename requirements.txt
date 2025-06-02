@@ -1,11 +1,11 @@
 # ========================================
-# MULTI-AI DISCORD NEWS BOT - RENDER + WIKIPEDIA EDITION
+# GEMINI INTELLIGENT DISCORD NEWS BOT - RENDER EDITION
 # ========================================
 # ✅ Optimized for Render Free Tier (512MB RAM)
-# ✅ Memory efficient dependencies + Wikipedia knowledge base
-# ✅ FREE AI APIs: Gemini + Groq
-# ✅ Features: News + Extract + Translate + Multi-AI + Wikipedia
-# ✅ Using spare 112MB for Wikipedia integration
+# ✅ Gemini AI intelligent system (primary for !hoi)
+# ✅ Groq AI for real translation only
+# ✅ Features: News + Extract + Translate + Intelligent AI + Wikipedia
+# ✅ Adaptive knowledge usage (5-95% news data based on question type)
 # ✅ Build time: ~3-4 minutes (reduced from 5-6)
 # ✅ Total size: ~180MB (reduced from 280MB)
 
@@ -93,13 +93,14 @@ gunicorn==22.0.0
 # 5. Keep-alive via keep_alive.py (already optimized)
 
 # ========================================
-# ✅ FEATURES PRESERVED + ENHANCED:
+# ✅ FEATURES PRESERVED + ENHANCED + INTELLIGENT:
 # ========================================
 # ✅ All news commands (!all, !in, !out)
 # ✅ Content extraction (!chitiet) with Trafilatura + Newspaper3k
-# ✅ Auto-translate for international news
-# ✅ Multi-AI system (!hoi) with Gemini + Groq FREE
+# ✅ Real translation with Groq AI for international news
+# ✅ Gemini intelligent system (!hoi) with adaptive knowledge usage
 # ✅ Wikipedia knowledge base integration (VN + EN)
+# ✅ Smart strategy selection based on question type
 # ✅ Vietnam timezone auto-update
 # ✅ Memory management and cleanup
 # ✅ Error handling and fallbacks
@@ -124,15 +125,17 @@ gunicorn==22.0.0
 # Total monthly cost: $0 🎉
 
 # ========================================
-# 🎯 PERFORMANCE EXPECTATIONS (Updated with Wikipedia):
+# 🎯 PERFORMANCE EXPECTATIONS (Updated with Gemini Intelligence):
 # ========================================
-# Response time: 2-5 seconds (vs 1-3 on Oracle)
+# Response time: 1-4 seconds (faster with less search dependency)
 # Memory usage: 400-450MB steady (vs 300-400MB without Wikipedia)
 # Concurrent users: 10-20 (vs 100+ on Oracle)
 # Uptime: 99%+ (Render free tier may sleep)
-# AI responses: 45 requests/minute total (Gemini 15 + Groq 30)
+# Gemini responses: 15 requests/minute (primary for !hoi)
+# Groq translations: 30 requests/minute (only for translation)
 # Wikipedia searches: Unlimited (local library, no API calls)
 # Knowledge base: Vietnamese + English Wikipedia integration
+# Intelligence: Adaptive strategy (5-95% news data based on question)
 
 # ========================================
 # 🔒 SECURITY & RELIABILITY:
@@ -155,8 +158,9 @@ gunicorn==22.0.0
 
 # Note: This requirements.txt is specifically optimized for:
 # - Render Free Tier hosting (512MB RAM limit)
-# - Maximum functionality with minimum memory usage
-# - $0/month operation cost
-# - Essential features + Wikipedia knowledge base (using spare 112MB)
+# - Gemini intelligent system with adaptive knowledge usage
+# - Real Groq translation for international content
+# - $0/month operation cost with smart resource management
+# - Wikipedia knowledge base + intelligent memory management
 # - Fast build and deployment times
-# - Smart memory management and cleanup
+# - Intelligent strategy selection based on question complexity
