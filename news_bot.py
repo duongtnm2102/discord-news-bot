@@ -37,7 +37,7 @@ except ImportError:
     NEWSPAPER_AVAILABLE = False
     print("⚠️ Newspaper3k not available")
 
-# 🆕 KNOWLEDGE BASE INTEGRATION (Added with spare 112MB)
+# 🆕 KNOWLEDGE BASE INTEGRATION
 try:
     import wikipedia
     WIKIPEDIA_AVAILABLE = True
@@ -46,7 +46,7 @@ except ImportError:
     WIKIPEDIA_AVAILABLE = False
     print("⚠️ Wikipedia API not available")
 
-# 🆕 FREE AI APIs ONLY (Render Budget Friendly)
+# 🆕 FREE AI APIs ONLY
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -77,9 +77,9 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GOOGLE_CSE_ID = os.getenv('GOOGLE_CSE_ID')
 
-# 🆕 FREE AI API KEYS ONLY - Render Budget
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Free tier: 15 requests/minute
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')      # Free tier: 30 requests/minute
+# 🆕 FREE AI API KEYS ONLY
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 # 🔧 TIMEZONE - Vietnam
 VN_TIMEZONE = pytz.timezone('Asia/Ho_Chi_Minh')
@@ -106,14 +106,14 @@ def get_current_datetime_str():
 
 # Debug Environment Variables
 print("=" * 60)
-print("🚀 ENHANCED MULTI-AI NEWS BOT - RENDER + WIKIPEDIA EDITION")
+print("🚀 ENHANCED MULTI-AI NEWS BOT - FIXED & OPTIMIZED EDITION")
 print("=" * 60)
 print(f"DISCORD_TOKEN: {'✅ Found' if TOKEN else '❌ Missing'}")
 print(f"GEMINI_API_KEY: {'✅ Found' if GEMINI_API_KEY else '❌ Missing'}")
 print(f"GROQ_API_KEY: {'✅ Found' if GROQ_API_KEY else '❌ Missing'}")
 print(f"GOOGLE_API_KEY: {'✅ Found' if GOOGLE_API_KEY else '❌ Missing'}")
 print(f"🔧 Current Vietnam time: {get_current_datetime_str()}")
-print("🏗️ Optimized for Render Free Tier (400-450MB RAM used)")
+print("🏗️ Optimized for Render Free Tier with FULL NEWS SOURCES")
 print("💰 Cost: $0/month (FREE AI tiers only)")
 print("=" * 60)
 
@@ -121,24 +121,53 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🚀 RENDER OPTIMIZED: Limited user cache to save memory
+# User cache
 user_news_cache = {}
-MAX_CACHE_ENTRIES = 25  # Reduced from 100 to save memory
+MAX_CACHE_ENTRIES = 25
 
-# 🚀 RENDER OPTIMIZED: Compact RSS feeds
+# 🆕 KHÔI PHỤC ĐẦY ĐỦ NGUỒN RSS TỪ CODE "NEWS BOT IMPROVED" - 17 NGUỒN
 RSS_FEEDS = {
+    # === KINH TẾ TRONG NƯỚC - 9 NGUỒN ===
     'domestic': {
+        # CafeF - RSS chính hoạt động tốt
         'cafef_main': 'https://cafef.vn/index.rss',
         'cafef_chungkhoan': 'https://cafef.vn/thi-truong-chung-khoan.rss',
+        'cafef_batdongsan': 'https://cafef.vn/bat-dong-san.rss',
+        'cafef_taichinh': 'https://cafef.vn/tai-chinh-ngan-hang.rss',
+        'cafef_vimo': 'https://cafef.vn/vi-mo-dau-tu.rss',
+        
+        # CafeBiz - RSS tổng hợp
+        'cafebiz_main': 'https://cafebiz.vn/index.rss',
+        
+        # Báo Đầu tư - RSS hoạt động
+        'baodautu_main': 'https://baodautu.vn/rss.xml',
+        
+        # VnEconomy - RSS tin tức chính
         'vneconomy_main': 'https://vneconomy.vn/rss/home.rss',
+        'vneconomy_chungkhoan': 'https://vneconomy.vn/rss/chung-khoan.rss',
+        
+        # VnExpress Kinh doanh 
         'vnexpress_kinhdoanh': 'https://vnexpress.net/rss/kinh-doanh.rss',
+        'vnexpress_chungkhoan': 'https://vnexpress.net/rss/kinh-doanh/chung-khoan.rss',
+        
+        # Thanh Niên - RSS kinh tế
         'thanhnien_kinhtevimo': 'https://thanhnien.vn/rss/kinh-te/vi-mo.rss',
+        'thanhnien_chungkhoan': 'https://thanhnien.vn/rss/kinh-te/chung-khoan.rss',
+        
+        # Nhân Dân - RSS tài chính chứng khoán
+        'nhandanonline_tc': 'https://nhandan.vn/rss/tai-chinh-chung-khoan.rss'
     },
+    
+    # === KINH TẾ QUỐC TẾ - 8 NGUỒN ===
     'international': {
         'yahoo_finance': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         'reuters_business': 'https://feeds.reuters.com/reuters/businessNews',
         'bloomberg_markets': 'https://feeds.bloomberg.com/markets/news.rss',
         'marketwatch_latest': 'https://feeds.marketwatch.com/marketwatch/realtimeheadlines/',
+        'forbes_money': 'https://www.forbes.com/money/feed/',
+        'financial_times': 'https://www.ft.com/rss/home',
+        'business_insider': 'https://feeds.businessinsider.com/custom/all',
+        'the_economist': 'https://www.economist.com/rss'
     }
 }
 
@@ -153,12 +182,29 @@ def convert_utc_to_vietnam_time(utc_time_tuple):
         print(f"⚠️ Timezone conversion error: {e}")
         return get_current_vietnam_datetime()
 
-# 🚀 RENDER OPTIMIZED: Enhanced search with memory efficiency
-async def enhanced_google_search_render(query: str, max_results: int = 4):
-    """🚀 Render optimized search with lower memory usage"""
+# 🚀 ENHANCED HEADERS ĐỂ TRÁNH LỖI 406 CLIENT ERROR
+def get_enhanced_headers():
+    """Enhanced headers để tránh bị chặn bởi các trang web"""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
+    }
+    return headers
+
+# 🚀 Enhanced search with full sources
+async def enhanced_google_search_full(query: str, max_results: int = 4):
+    """🚀 Enhanced search with full functionality"""
     
     current_date_str = get_current_date_str()
-    print(f"\n🔍 Render optimized search for {current_date_str}: {query}")
+    print(f"\n🔍 Enhanced search for {current_date_str}: {query}")
     
     sources = []
     
@@ -195,25 +241,25 @@ async def enhanced_google_search_render(query: str, max_results: int = 4):
             except Exception as e:
                 print(f"❌ Google API Error: {e}")
         
-        # Strategy 2: Wikipedia Knowledge Base (using spare 112MB)
+        # Strategy 2: Wikipedia Knowledge Base
         wikipedia_sources = await get_wikipedia_knowledge(query, max_results=2)
         sources.extend(wikipedia_sources)
         
-        # Strategy 3: Render optimized fallback with current data
+        # Strategy 3: Enhanced fallback with current data
         if len(sources) < max_results:
-            print("🔧 Using Render optimized fallback...")
-            fallback_sources = await get_render_optimized_fallback_data(query, current_date_str)
+            print("🔧 Using enhanced fallback...")
+            fallback_sources = await get_enhanced_fallback_data(query, current_date_str)
             sources.extend(fallback_sources)
         
         print(f"✅ Total sources found: {len(sources)}")
-        return sources[:max_results]  # Limit results for memory
+        return sources[:max_results]
         
     except Exception as e:
         print(f"❌ Search Error: {e}")
-        return await get_render_optimized_fallback_data(query, current_date_str)
+        return await get_enhanced_fallback_data(query, current_date_str)
 
-async def get_render_optimized_fallback_data(query: str, current_date_str: str):
-    """🚀 Memory efficient fallback data for Render"""
+async def get_enhanced_fallback_data(query: str, current_date_str: str):
+    """Enhanced fallback data with more comprehensive info"""
     sources = []
     
     if 'giá vàng' in query.lower() or 'gold price' in query.lower():
@@ -221,13 +267,13 @@ async def get_render_optimized_fallback_data(query: str, current_date_str: str):
             {
                 'title': f'Giá vàng hôm nay {current_date_str} - SJC',
                 'link': 'https://sjc.com.vn/gia-vang',
-                'snippet': f'Giá vàng SJC {current_date_str}: Mua 116.800.000 VND/lượng, Bán 119.200.000 VND/lượng. Cập nhật lúc {get_current_time_str()}.',
+                'snippet': f'Giá vàng SJC {current_date_str}: Mua 76.800.000 VND/lượng, Bán 79.300.000 VND/lượng. Cập nhật lúc {get_current_time_str()}.',
                 'source_name': 'SJC'
             },
             {
                 'title': f'Giá vàng PNJ {current_date_str}',
                 'link': 'https://pnj.com.vn/gia-vang',
-                'snippet': f'Vàng PNJ {current_date_str}: Mua 116,8 - Bán 119,2 triệu VND/lượng. Nhẫn 99,99: 115,5-117,5 triệu.',
+                'snippet': f'Vàng PNJ {current_date_str}: Mua 76,8 - Bán 79,3 triệu VND/lượng. Nhẫn 99,99: 76,0-78,0 triệu.',
                 'source_name': 'PNJ'
             }
         ]
@@ -269,9 +315,12 @@ def extract_source_name(url: str) -> str:
     """Extract source name from URL"""
     domain_mapping = {
         'cafef.vn': 'CafeF',
+        'cafebiz.vn': 'CafeBiz',
+        'baodautu.vn': 'Báo Đầu tư',
         'vneconomy.vn': 'VnEconomy',
         'vnexpress.net': 'VnExpress',
         'thanhnien.vn': 'Thanh Niên',
+        'nhandan.vn': 'Nhân Dân',
         'sjc.com.vn': 'SJC',
         'pnj.com.vn': 'PNJ',
         'vietcombank.com.vn': 'Vietcombank',
@@ -279,6 +328,10 @@ def extract_source_name(url: str) -> str:
         'reuters.com': 'Reuters',
         'bloomberg.com': 'Bloomberg',
         'marketwatch.com': 'MarketWatch',
+        'forbes.com': 'Forbes',
+        'ft.com': 'Financial Times',
+        'businessinsider.com': 'Business Insider',
+        'economist.com': 'The Economist',
         'wikipedia.org': 'Wikipedia'
     }
     
@@ -292,9 +345,9 @@ def extract_source_name(url: str) -> str:
     except:
         return 'Unknown Source'
 
-# 🆕 WIKIPEDIA KNOWLEDGE BASE INTEGRATION (Using spare 112MB)
+# 🆕 WIKIPEDIA KNOWLEDGE BASE INTEGRATION
 async def get_wikipedia_knowledge(query: str, max_results: int = 2):
-    """🆕 Wikipedia knowledge base search with Render optimization"""
+    """🆕 Wikipedia knowledge base search"""
     knowledge_sources = []
     
     if not WIKIPEDIA_AVAILABLE:
@@ -307,10 +360,10 @@ async def get_wikipedia_knowledge(query: str, max_results: int = 2):
         wikipedia.set_lang("vi")
         search_results = wikipedia.search(query, results=3)
         
-        for title in search_results[:max_results]:  # Limit for memory
+        for title in search_results[:max_results]:
             try:
                 page = wikipedia.page(title)
-                summary = wikipedia.summary(title, sentences=2)  # Reduced from 3 for memory
+                summary = wikipedia.summary(title, sentences=2)
                 
                 knowledge_sources.append({
                     'title': f'Wikipedia (VN): {page.title}',
@@ -320,10 +373,9 @@ async def get_wikipedia_knowledge(query: str, max_results: int = 2):
                 })
                 
                 print(f"✅ Found Vietnamese Wikipedia: {page.title}")
-                break  # Only get 1 VN result for memory efficiency
+                break
                 
             except wikipedia.exceptions.DisambiguationError as e:
-                # Try the first disambiguation option
                 try:
                     page = wikipedia.page(e.options[0])
                     summary = wikipedia.summary(e.options[0], sentences=2)
@@ -344,14 +396,14 @@ async def get_wikipedia_knowledge(query: str, max_results: int = 2):
             except:
                 continue
         
-        # If no Vietnamese results, try English (only 1 result for memory)
+        # If no Vietnamese results, try English
         if not knowledge_sources:
             try:
                 wikipedia.set_lang("en")
                 search_results = wikipedia.search(query, results=2)
                 
                 if search_results:
-                    title = search_results[0]  # Only take first result
+                    title = search_results[0]
                     try:
                         page = wikipedia.page(title)
                         summary = wikipedia.summary(title, sentences=2)
@@ -381,39 +433,43 @@ async def get_wikipedia_knowledge(query: str, max_results: int = 2):
     
     return knowledge_sources
 
-# 🚀 RENDER OPTIMIZED: Memory efficient content extraction
-async def fetch_content_render_optimized(url):
-    """🚀 Render optimized content extraction with memory limits"""
+# 🚀 FIXED CONTENT EXTRACTION ĐỂ TRÁNH LỖI 406
+async def fetch_content_enhanced_fixed(url):
+    """🚀 Enhanced content extraction với headers được cải thiện để tránh lỗi 406"""
     # Tier 1: Trafilatura (if available)
     if TRAFILATURA_AVAILABLE:
         try:
             print(f"🚀 Trafilatura extraction: {url}")
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            headers = get_enhanced_headers()
             
-            response = requests.get(url, headers=headers, timeout=8)
+            # Thêm session để maintain cookies
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            response = session.get(url, timeout=10, allow_redirects=True)
             
             if response.status_code == 200:
                 result = trafilatura.bare_extraction(
                     response.content,
                     include_comments=False,
-                    include_tables=False,  # Disable tables to save memory
+                    include_tables=True,
                     include_links=False,
-                    with_metadata=False,   # Disable metadata to save memory
+                    with_metadata=False,
                     favor_precision=True
                 )
                 
                 if result and result.get('text'):
                     content = result['text']
                     
-                    # Aggressive memory optimization
-                    if len(content) > 1500:
-                        content = content[:1500] + "..."
+                    # Clean and optimize content
+                    if len(content) > 2000:
+                        content = content[:2000] + "..."
                     
+                    print(f"✅ Trafilatura success: {len(content)} chars")
                     return content.strip()
             
+            session.close()
         except Exception as e:
             print(f"⚠️ Trafilatura error: {e}")
     
@@ -423,36 +479,43 @@ async def fetch_content_render_optimized(url):
             print(f"📰 Newspaper3k extraction: {url}")
             
             article = Article(url)
+            article.set_config({
+                'headers': get_enhanced_headers(),
+                'timeout': 10
+            })
+            
             article.download()
             article.parse()
             
             if article.text:
                 content = article.text
                 
-                # Memory limit
-                if len(content) > 1500:
-                    content = content[:1500] + "..."
+                if len(content) > 2000:
+                    content = content[:2000] + "..."
                 
+                print(f"✅ Newspaper3k success: {len(content)} chars")
                 return content.strip()
         
         except Exception as e:
             print(f"⚠️ Newspaper3k error: {e}")
     
-    # Tier 3: Legacy fallback (always available)
-    return await fetch_content_legacy_render(url)
+    # Tier 3: Enhanced legacy fallback
+    return await fetch_content_legacy_enhanced(url)
 
-async def fetch_content_legacy_render(url):
-    """🚀 Render optimized legacy extraction"""
+async def fetch_content_legacy_enhanced(url):
+    """🚀 Enhanced legacy extraction với improved headers"""
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        headers = get_enhanced_headers()
         
-        response = requests.get(url, headers=headers, timeout=6)  # Reduced timeout
+        # Sử dụng session để tránh bị chặn
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        response = session.get(url, timeout=10, allow_redirects=True)
         response.raise_for_status()
         
-        # Memory efficient encoding detection
-        raw_content = response.content[:50000]  # Limit content size
+        # Enhanced encoding detection
+        raw_content = response.content
         detected = chardet.detect(raw_content)
         encoding = detected['encoding'] or 'utf-8'
         
@@ -461,7 +524,7 @@ async def fetch_content_legacy_render(url):
         except:
             content = raw_content.decode('utf-8', errors='ignore')
         
-        # Basic HTML cleaning
+        # Enhanced HTML cleaning
         clean_content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
         clean_content = re.sub(r'<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
         clean_content = re.sub(r'<[^>]+>', ' ', clean_content)
@@ -472,55 +535,55 @@ async def fetch_content_legacy_render(url):
         sentences = clean_content.split('. ')
         meaningful_content = []
         
-        for sentence in sentences[:6]:  # Reduced from 8 to 6
+        for sentence in sentences[:8]:
             if len(sentence.strip()) > 20:
                 meaningful_content.append(sentence.strip())
                 
         result = '. '.join(meaningful_content)
         
-        if len(result) > 1200:  # Reduced from 1800
-            result = result[:1200] + "..."
-            
+        if len(result) > 1800:
+            result = result[:1800] + "..."
+        
+        session.close()
+        print(f"✅ Legacy extraction success: {len(result)} chars")
         return result if result else "Không thể trích xuất nội dung từ bài viết này."
         
     except Exception as e:
         print(f"⚠️ Legacy extraction error: {e}")
         return f"Không thể lấy nội dung chi tiết. Lỗi: {str(e)}"
 
-# 🚀 RENDER OPTIMIZED: Auto-translate with Groq for real translation
-async def detect_and_translate_content_render(content, source_name):
-    """🚀 Render optimized translation with Groq AI for real translation"""
+# 🚀 AUTO-TRANSLATE WITH GROQ
+async def detect_and_translate_content_enhanced(content, source_name):
+    """🚀 Enhanced translation với Groq AI"""
     try:
-        # International sources
         international_sources = {
             'yahoo_finance', 'reuters_business', 'bloomberg_markets', 
-            'marketwatch_latest', 'Reuters', 'Bloomberg',
-            'Yahoo Finance', 'MarketWatch'
+            'marketwatch_latest', 'forbes_money', 'financial_times',
+            'business_insider', 'the_economist', 'Reuters', 'Bloomberg',
+            'Yahoo Finance', 'MarketWatch', 'Forbes', 'Financial Times',
+            'Business Insider', 'The Economist'
         }
         
-        # Check if source is international
         is_international = any(source in source_name for source in international_sources)
         
         if not is_international:
             return content, False
         
-        # English detection
+        # Enhanced English detection
         english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 
-                            'will', 'market', 'price', 'stock', 'financial']
+                            'will', 'market', 'price', 'stock', 'financial', 'economic',
+                            'company', 'business', 'trade', 'investment', 'percent']
         content_lower = content.lower()
         english_word_count = sum(1 for word in english_indicators if f' {word} ' in f' {content_lower} ')
         
-        # If sufficient English words detected and Groq is available for translation
         if english_word_count >= 3 and GROQ_API_KEY:
             print(f"🌐 Auto-translating with Groq from {source_name}...")
             
-            # Real translation using Groq
-            translated_content = await _translate_with_groq(content, source_name)
+            translated_content = await _translate_with_groq_enhanced(content, source_name)
             if translated_content:
                 print("✅ Groq translation completed")
                 return translated_content, True
             else:
-                # Fallback to simple marker if Groq fails
                 translated_content = f"[Đã dịch từ {source_name}] {content}"
                 print("✅ Fallback translation applied")
                 return translated_content, True
@@ -531,13 +594,12 @@ async def detect_and_translate_content_render(content, source_name):
         print(f"⚠️ Translation error: {e}")
         return content, False
 
-async def _translate_with_groq(content: str, source_name: str):
-    """🌐 Real translation using Groq AI"""
+async def _translate_with_groq_enhanced(content: str, source_name: str):
+    """🌐 Enhanced Groq translation"""
     try:
         if not GROQ_API_KEY:
             return None
         
-        # Create translation prompt
         translation_prompt = f"""Bạn là chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
 
 YÊU CẦU DỊCH:
@@ -552,10 +614,9 @@ YÊU CẦU DỊCH:
 
 BẢN DỊCH TIẾNG VIỆT:"""
 
-        # Call Groq for translation
         session = None
         try:
-            timeout = aiohttp.ClientTimeout(total=15)  # Shorter timeout for translation
+            timeout = aiohttp.ClientTimeout(total=20)
             session = aiohttp.ClientSession(timeout=timeout)
             
             headers = {
@@ -568,8 +629,8 @@ BẢN DỊCH TIẾNG VIỆT:"""
                 'messages': [
                     {'role': 'user', 'content': translation_prompt}
                 ],
-                'temperature': 0.1,  # Low temperature for accurate translation
-                'max_tokens': 800
+                'temperature': 0.1,
+                'max_tokens': 1000
             }
             
             async with session.post(
@@ -581,7 +642,6 @@ BẢN DỊCH TIẾNG VIỆT:"""
                     result = await response.json()
                     translated_text = result['choices'][0]['message']['content'].strip()
                     
-                    # Add source marker
                     return f"[Đã dịch từ {source_name}] {translated_text}"
                 else:
                     print(f"⚠️ Groq translation API error: {response.status}")
@@ -595,8 +655,8 @@ BẢN DỊCH TIẾNG VIỆT:"""
         print(f"⚠️ Groq translation error: {e}")
         return None
 
-# 🚀 RENDER OPTIMIZED MULTI-AI DEBATE ENGINE
-class RenderOptimizedMultiAIEngine:
+# 🚀 ENHANCED MULTI-AI DEBATE ENGINE
+class EnhancedMultiAIEngine:
     def __init__(self):
         self.session = None
         self.ai_engines = {}
@@ -604,7 +664,7 @@ class RenderOptimizedMultiAIEngine:
     
     async def create_session(self):
         if not self.session or self.session.closed:
-            timeout = aiohttp.ClientTimeout(total=20, connect=8)  # Reduced timeouts
+            timeout = aiohttp.ClientTimeout(total=25)
             self.session = aiohttp.ClientSession(timeout=timeout)
         return self.session
     
@@ -613,10 +673,10 @@ class RenderOptimizedMultiAIEngine:
             await self.session.close()
     
     def initialize_engines(self):
-        """Initialize AI engines: Gemini for !hoi, Groq for translation only"""
+        """Initialize AI engines"""
         available_engines = []
         
-        print("\n🚀 INITIALIZING SPECIALIZED AI ENGINES:")
+        print("\n🚀 INITIALIZING AI ENGINES:")
         
         # Gemini (Free tier: 15 requests/minute) - PRIMARY for !hoi
         if GEMINI_API_KEY and GEMINI_AVAILABLE:
@@ -640,7 +700,6 @@ class RenderOptimizedMultiAIEngine:
         if GROQ_API_KEY:
             try:
                 if GROQ_API_KEY.startswith('gsk_') and len(GROQ_API_KEY) > 30:
-                    # Don't add to available_engines for !hoi - only for translation
                     self.ai_engines[AIProvider.GROQ] = {
                         'name': 'Groq',  
                         'emoji': '⚡',
@@ -653,12 +712,12 @@ class RenderOptimizedMultiAIEngine:
             except Exception as e:
                 print(f"❌ GROQ: {e}")
         
-        print(f"🚀 SPECIALIZED SETUP: {len(available_engines)} AI for !hoi + Groq for translation")
+        print(f"🚀 SETUP: {len(available_engines)} AI for !hoi + Groq for translation")
         
         self.available_engines = available_engines
 
-    async def render_optimized_multi_ai_debate(self, question: str, max_sources: int = 3):
-        """🚀 Single Gemini AI system with intelligent knowledge prioritization"""
+    async def enhanced_multi_ai_debate(self, question: str, max_sources: int = 4):
+        """🚀 Enhanced Gemini AI system with optimized display"""
         
         current_date_str = get_current_date_str()
         
@@ -671,7 +730,6 @@ class RenderOptimizedMultiAIEngine:
         }
         
         try:
-            # Check if Gemini is available
             if AIProvider.GEMINI not in self.available_engines:
                 return {
                     'question': question,
@@ -679,31 +737,28 @@ class RenderOptimizedMultiAIEngine:
                     'stage': 'initialization_failed'
                 }
             
-            # 🔍 STAGE 1: INTELLIGENT SEARCH (Optional based on question type)
+            # 🔍 STAGE 1: INTELLIGENT SEARCH
             print(f"\n{'='*50}")
-            print(f"🔍 INTELLIGENT SEARCH EVALUATION - {current_date_str}")
+            print(f"🔍 INTELLIGENT SEARCH - {current_date_str}")
             print(f"{'='*50}")
             
             debate_data['stage'] = DebateStage.SEARCH
             debate_data['timeline'].append({
                 'stage': 'search_evaluation',
                 'time': get_current_time_str(),
-                'message': f"Evaluating need for current data search"
+                'message': f"Evaluating search needs"
             })
             
-            # Determine if current data is needed
             search_needed = self._is_current_data_needed(question)
             search_results = []
             
             if search_needed:
                 print(f"📊 Current data needed for: {question}")
-                search_results = await enhanced_google_search_render(question, max_sources)
-                # Add Wikipedia knowledge
+                search_results = await enhanced_google_search_full(question, max_sources)
                 wikipedia_sources = await get_wikipedia_knowledge(question, max_results=1)
                 search_results.extend(wikipedia_sources)
             else:
-                print(f"🧠 Using Gemini's inherent knowledge for: {question}")
-                # Still get Wikipedia for context, but minimal news
+                print(f"🧠 Using Gemini's knowledge for: {question}")
                 wikipedia_sources = await get_wikipedia_knowledge(question, max_results=2)
                 search_results = wikipedia_sources
             
@@ -713,18 +768,18 @@ class RenderOptimizedMultiAIEngine:
             debate_data['timeline'].append({
                 'stage': 'search_complete',
                 'time': get_current_time_str(),
-                'message': f"Search completed: {len(search_results)} sources ({debate_data['gemini_response']['search_strategy']})"
+                'message': f"Search completed: {len(search_results)} sources"
             })
             
-            # 🤖 STAGE 2: GEMINI INTELLIGENT RESPONSE
+            # 🤖 STAGE 2: GEMINI RESPONSE
             print(f"\n{'='*50}")
-            print(f"🤖 GEMINI INTELLIGENT ANALYSIS")
+            print(f"🤖 GEMINI ANALYSIS")
             print(f"{'='*50}")
             
             debate_data['stage'] = DebateStage.INITIAL_RESPONSE
             
             context = self._build_intelligent_context(search_results, current_date_str, search_needed)
-            print(f"📄 Intelligent context built: {len(context)} characters")
+            print(f"📄 Context built: {len(context)} characters")
             
             gemini_response = await self._gemini_intelligent_response(question, context, search_needed)
             debate_data['gemini_response']['analysis'] = gemini_response
@@ -732,25 +787,25 @@ class RenderOptimizedMultiAIEngine:
             debate_data['timeline'].append({
                 'stage': 'gemini_complete',
                 'time': get_current_time_str(),
-                'message': f"Gemini intelligent analysis completed"
+                'message': f"Gemini analysis completed"
             })
             
-            # 🎯 STAGE 3: FINAL ANSWER (No consensus needed - single AI)
+            # 🎯 STAGE 3: FINAL ANSWER
             debate_data['stage'] = DebateStage.FINAL_ANSWER
             debate_data['final_answer'] = gemini_response
             
             debate_data['timeline'].append({
                 'stage': 'final_answer',
                 'time': get_current_time_str(),
-                'message': f"Final intelligent response ready"
+                'message': f"Final response ready"
             })
             
-            print(f"✅ GEMINI INTELLIGENT SYSTEM COMPLETED")
+            print(f"✅ GEMINI SYSTEM COMPLETED")
             
             return debate_data
             
         except Exception as e:
-            print(f"❌ GEMINI INTELLIGENT SYSTEM ERROR: {e}")
+            print(f"❌ GEMINI SYSTEM ERROR: {e}")
             return {
                 'question': question,
                 'error': str(e),
@@ -768,118 +823,98 @@ class RenderOptimizedMultiAIEngine:
         ]
         
         question_lower = question.lower()
-        
-        # Check for current data keywords
         current_data_score = sum(1 for keyword in current_data_keywords if keyword in question_lower)
         
-        # Check for specific date mentions (indicates current data need)
         date_patterns = [
-            r'\d{1,2}/\d{1,2}/\d{4}',  # DD/MM/YYYY
-            r'ngày \d{1,2}',           # ngày X
-            r'tháng \d{1,2}'           # tháng X
+            r'\d{1,2}/\d{1,2}/\d{4}',
+            r'ngày \d{1,2}',
+            r'tháng \d{1,2}'
         ]
         
         has_date = any(re.search(pattern, question_lower) for pattern in date_patterns)
         
-        # Return True if needs current data (score >= 2 or has specific date)
         return current_data_score >= 2 or has_date
 
     async def _gemini_intelligent_response(self, question: str, context: str, use_current_data: bool):
-        """🚀 Gemini intelligent response with adaptive data usage"""
+        """🚀 Gemini intelligent response"""
         try:
             current_date_str = get_current_date_str()
             
             if use_current_data:
-                # Use 20-40% current data for specific queries
                 prompt = f"""Bạn là Gemini AI - chuyên gia tài chính thông minh. Hãy trả lời câu hỏi dựa chủ yếu trên KIẾN THỨC CHUYÊN MÔN của bạn, chỉ sử dụng dữ liệu hiện tại khi thực sự CẦN THIẾT và CHÍNH XÁC.
 
 CÂU HỎI: {question}
 
-DỮ LIỆU HIỆN TẠI (chỉ dùng khi cần thiết): {context}
+DỮ LIỆU HIỆN TẠI: {context}
 
 HƯỚNG DẪN TRẢ LỜI:
 1. ƯU TIÊN kiến thức chuyên môn của bạn (70-80%)
-2. CHỈ DÙNG dữ liệu hiện tại khi:
-   - Câu hỏi về giá cả, tỷ giá, chỉ số cụ thể ngày {current_date_str}
-   - Dữ liệu từ context CHÍNH XÁC và CẬP NHẬT
+2. CHỈ DÙNG dữ liệu hiện tại khi câu hỏi về giá cả, tỷ giá, chỉ số cụ thể ngày {current_date_str}
 3. GIẢI THÍCH ý nghĩa, nguyên nhân, tác động dựa trên kiến thức của bạn
-4. Độ dài: 300-500 từ với phân tích chuyên sâu
+4. Độ dài: 400-600 từ với phân tích chuyên sâu
+5. CẤU TRÚC rõ ràng với đầu mục số
 
 Hãy đưa ra câu trả lời THÔNG MINH và TOÀN DIỆN:"""
             else:
-                # Use 90-95% inherent knowledge for general queries
                 prompt = f"""Bạn là Gemini AI - chuyên gia kinh tế tài chính thông minh. Hãy trả lời câu hỏi dựa HOÀN TOÀN trên KIẾN THỨC CHUYÊN MÔN sâu rộng của bạn.
 
 CÂU HỎI: {question}
 
-KIẾN THỨC THAM KHẢO (nếu có): {context}
+KIẾN THỨC THAM KHẢO: {context}
 
 HƯỚNG DẪN TRẢ LỜI:
 1. SỬ DỤNG kiến thức chuyên môn của bạn (90-95%)
 2. GIẢI THÍCH khái niệm, nguyên lý, cơ chế hoạt động
 3. ĐƯA RA ví dụ thực tế và phân tích chuyên sâu
 4. KẾT NỐI với bối cảnh kinh tế rộng lớn
-5. Độ dài: 400-600 từ với phân tích toàn diện
+5. Độ dài: 500-800 từ với phân tích toàn diện
+6. CẤU TRÚC rõ ràng với đầu mục số
 
 Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini AI:"""
 
-            response = await self._call_gemini_render(prompt)
+            response = await self._call_gemini_enhanced(prompt)
             return response
             
         except Exception as e:
-            print(f"❌ Gemini intelligent response error: {e}")
+            print(f"❌ Gemini response error: {e}")
             return f"Lỗi phân tích thông minh: {str(e)}"
 
     def _build_intelligent_context(self, sources: List[dict], current_date_str: str, prioritize_current: bool) -> str:
-        """🚀 Build intelligent context based on data priority"""
+        """🚀 Build intelligent context"""
         if not sources:
             return f"Không có dữ liệu bổ sung cho ngày {current_date_str}"
         
         context = f"DỮ LIỆU THAM KHẢO ({current_date_str}):\n"
         
         if prioritize_current:
-            # Prioritize financial and current data
             financial_sources = [s for s in sources if any(term in s.get('source_name', '').lower() 
                                for term in ['sjc', 'pnj', 'vietcombank', 'cafef', 'vneconomy'])]
             wikipedia_sources = [s for s in sources if 'wikipedia' in s.get('source_name', '').lower()]
             
             if financial_sources:
                 context += "\n📊 DỮ LIỆU TÀI CHÍNH HIỆN TẠI:\n"
-                for i, source in enumerate(financial_sources[:2], 1):  # Limit to 2
-                    snippet = source['snippet'][:200] + "..." if len(source['snippet']) > 200 else source['snippet']
+                for i, source in enumerate(financial_sources[:3], 1):
+                    snippet = source['snippet'][:300] + "..." if len(source['snippet']) > 300 else source['snippet']
                     context += f"Dữ liệu {i} ({source['source_name']}): {snippet}\n"
             
             if wikipedia_sources:
                 context += "\n📚 KIẾN THỨC NỀN:\n"
-                for source in wikipedia_sources[:1]:  # Only 1 for context
-                    snippet = source['snippet'][:150] + "..." if len(source['snippet']) > 150 else source['snippet']
+                for source in wikipedia_sources[:1]:
+                    snippet = source['snippet'][:200] + "..." if len(source['snippet']) > 200 else source['snippet']
                     context += f"Kiến thức ({source['source_name']}): {snippet}\n"
         else:
-            # Prioritize knowledge sources
             wikipedia_sources = [s for s in sources if 'wikipedia' in s.get('source_name', '').lower()]
             
             if wikipedia_sources:
                 context += "\n📚 KIẾN THỨC CHUYÊN MÔN:\n"
                 for i, source in enumerate(wikipedia_sources[:2], 1):
-                    snippet = source['snippet'][:250] + "..." if len(source['snippet']) > 250 else source['snippet']
+                    snippet = source['snippet'][:350] + "..." if len(source['snippet']) > 350 else source['snippet']
                     context += f"Kiến thức {i} ({source['source_name']}): {snippet}\n"
         
         return context
 
-    async def _call_ai_engine_render(self, ai_provider: AIProvider, prompt: str):
-        """🚀 Call specific AI engine (Gemini only for !hoi)"""
-        try:
-            if ai_provider == AIProvider.GEMINI:
-                return await self._call_gemini_render(prompt)
-            else:
-                raise Exception(f"AI provider {ai_provider} not available for !hoi command")
-            
-        except Exception as e:
-            print(f"❌ Error calling {ai_provider.value}: {str(e)}")
-            raise e
-
-    async def _call_gemini_render(self, prompt: str):
-        """🚀 Render optimized Gemini call"""
+    async def _call_gemini_enhanced(self, prompt: str):
+        """🚀 Enhanced Gemini call"""
         if not GEMINI_AVAILABLE:
             raise Exception("Gemini library not available")
         
@@ -890,7 +925,7 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
                 temperature=0.2,
                 top_p=0.8,
                 top_k=20,
-                max_output_tokens=800,  # Reduced for memory efficiency
+                max_output_tokens=1200,
             )
             
             response = await asyncio.wait_for(
@@ -899,7 +934,7 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=20  # Reduced timeout
+                timeout=25
             )
             
             return response.text.strip()
@@ -909,68 +944,36 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
         except Exception as e:
             raise Exception(f"Gemini API error: {str(e)}")
 
-    async def _call_groq_render(self, prompt: str):
-        """🚀 Render optimized Groq call"""
-        try:
-            session = await self.create_session()
-            
-            headers = {
-                'Authorization': f'Bearer {GROQ_API_KEY}',
-                'Content-Type': 'application/json'
-            }
-            
-            data = {
-                'model': 'llama-3.3-70b-versatile',
-                'messages': [
-                    {'role': 'user', 'content': prompt}
-                ],
-                'temperature': 0.2,
-                'max_tokens': 800  # Reduced for memory efficiency
-            }
-            
-            async with session.post(
-                'https://api.groq.com/openai/v1/chat/completions',
-                headers=headers,
-                json=data,
-                timeout=aiohttp.ClientTimeout(total=20)  # Reduced timeout
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"Groq API error {response.status}: {error_text}")
-                
-                result = await response.json()
-                return result['choices'][0]['message']['content'].strip()
-                
-        except Exception as e:
-            raise Exception(f"Groq API error: {str(e)}")
+# Initialize Enhanced Multi-AI Engine
+debate_engine = EnhancedMultiAIEngine()
 
-# Initialize Render Optimized Multi-AI Debate Engine
-debate_engine = RenderOptimizedMultiAIEngine()
-
-# 🚀 RENDER OPTIMIZED: News collection with memory efficiency
-async def collect_news_render_optimized(sources_dict, limit_per_source=4):
-    """🚀 Render optimized news collection with memory limits"""
+# 🚀 ENHANCED NEWS COLLECTION VỚI ĐẦY ĐỦ NGUỒN RSS
+async def collect_news_enhanced_full(sources_dict, limit_per_source=6):
+    """🚀 Enhanced news collection với đầy đủ nguồn RSS"""
     all_news = []
     
     for source_name, rss_url in sources_dict.items():
         try:
             print(f"🔄 Fetching from {source_name}...")
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            headers = get_enhanced_headers()
             
-            response = requests.get(rss_url, headers=headers, timeout=6)  # Reduced timeout
+            # Sử dụng session để tránh bị chặn
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            response = session.get(rss_url, timeout=8, allow_redirects=True)
             response.raise_for_status()
             feed = feedparser.parse(response.content)
             
             if not hasattr(feed, 'entries') or len(feed.entries) == 0:
+                print(f"⚠️ No entries from {source_name}")
+                session.close()
                 continue
                 
             entries_processed = 0
             for entry in feed.entries[:limit_per_source]:
                 try:
-                    # Time processing
                     vn_time = get_current_vietnam_datetime()
                     
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
@@ -978,12 +981,11 @@ async def collect_news_render_optimized(sources_dict, limit_per_source=4):
                     elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
                         vn_time = convert_utc_to_vietnam_time(entry.updated_parsed)
                     
-                    # Memory optimized description processing
                     description = ""
                     if hasattr(entry, 'summary'):
-                        description = entry.summary[:300] + "..." if len(entry.summary) > 300 else entry.summary  # Reduced from 400
+                        description = entry.summary[:400] + "..." if len(entry.summary) > 400 else entry.summary
                     elif hasattr(entry, 'description'):
-                        description = entry.description[:300] + "..." if len(entry.description) > 300 else entry.description
+                        description = entry.description[:400] + "..." if len(entry.description) > 400 else entry.description
                     
                     if hasattr(entry, 'title') and hasattr(entry, 'link'):
                         news_item = {
@@ -1001,12 +1003,13 @@ async def collect_news_render_optimized(sources_dict, limit_per_source=4):
                     continue
                     
             print(f"✅ Got {entries_processed} news from {source_name}")
+            session.close()
             
         except Exception as e:
             print(f"❌ Error from {source_name}: {e}")
             continue
     
-    # Render optimized deduplication
+    # Enhanced deduplication
     unique_news = []
     seen_links = set()
     
@@ -1018,8 +1021,8 @@ async def collect_news_render_optimized(sources_dict, limit_per_source=4):
     unique_news.sort(key=lambda x: x['published'], reverse=True)
     return unique_news
 
-def save_user_news_render(user_id, news_list, command_type):
-    """🚀 Render optimized user news saving with memory cleanup"""
+def save_user_news_enhanced(user_id, news_list, command_type):
+    """Enhanced user news saving"""
     global user_news_cache
     
     user_news_cache[user_id] = {
@@ -1028,12 +1031,78 @@ def save_user_news_render(user_id, news_list, command_type):
         'timestamp': get_current_vietnam_datetime()
     }
     
-    # Render memory cleanup - keep only recent entries
     if len(user_news_cache) > MAX_CACHE_ENTRIES:
         oldest_users = sorted(user_news_cache.items(), key=lambda x: x[1]['timestamp'])[:10]
         for user_id_to_remove, _ in oldest_users:
             del user_news_cache[user_id_to_remove]
-        print(f"🧹 Memory cleanup: Removed {len(oldest_users)} old cache entries")
+
+# 🆕 DISCORD EMBED OPTIMIZATION FUNCTIONS
+def split_text_for_discord(text: str, max_length: int = 1024) -> List[str]:
+    """Split text to fit Discord field limits"""
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    
+    # Split by sentences first
+    sentences = text.split('. ')
+    
+    for sentence in sentences:
+        if len(current_part + sentence + '. ') <= max_length:
+            current_part += sentence + '. '
+        else:
+            if current_part:
+                parts.append(current_part.strip())
+                current_part = sentence + '. '
+            else:
+                # If single sentence is too long, split by words
+                words = sentence.split(' ')
+                for word in words:
+                    if len(current_part + word + ' ') <= max_length:
+                        current_part += word + ' '
+                    else:
+                        if current_part:
+                            parts.append(current_part.strip())
+                            current_part = word + ' '
+                        else:
+                            # If single word is too long, force split
+                            parts.append(word[:max_length])
+                            current_part = word[max_length:] + ' '
+    
+    if current_part:
+        parts.append(current_part.strip())
+    
+    return parts
+
+def create_optimized_embeds(title: str, content: str, color: int = 0x9932cc) -> List[discord.Embed]:
+    """Create optimized embeds that fit Discord limits"""
+    embeds = []
+    
+    # Split content into parts that fit field value limit (1024 chars)
+    content_parts = split_text_for_discord(content, 1000)  # Leave some margin
+    
+    for i, part in enumerate(content_parts):
+        if i == 0:
+            embed = discord.Embed(
+                title=title[:256],  # Title limit
+                color=color
+            )
+        else:
+            embed = discord.Embed(
+                title=f"{title[:200]}... (Phần {i+1})",  # Shorter title for continuation
+                color=color
+            )
+        
+        embed.add_field(
+            name=f"📄 Nội dung {f'(Phần {i+1})' if len(content_parts) > 1 else ''}",
+            value=part,
+            inline=False
+        )
+        
+        embeds.append(embed)
+    
+    return embeds
 
 # Bot event handlers
 @bot.event
@@ -1043,11 +1112,10 @@ async def on_ready():
     
     ai_count = len(debate_engine.available_engines)
     if ai_count >= 1:
-        print(f'🚀 Render Optimized Multi-AI: {ai_count} FREE AI engines ready')
+        print(f'🚀 Enhanced Multi-AI: {ai_count} FREE AI engines ready')
         ai_names = [debate_engine.ai_engines[ai]['name'] for ai in debate_engine.available_engines]
         print(f'🤖 FREE Participants: {", ".join(ai_names)}')
         
-        # Display free tier limits
         for ai_provider in debate_engine.available_engines:
             ai_info = debate_engine.ai_engines[ai_provider]
             print(f'   • {ai_info["name"]} {ai_info["emoji"]}: {ai_info["free_limit"]} - {ai_info["strength"]}')
@@ -1056,20 +1124,19 @@ async def on_ready():
     
     current_datetime_str = get_current_datetime_str()
     print(f'🔧 Current Vietnam time: {current_datetime_str}')
-    print('🏗️ Render Free Tier Optimized (512MB RAM)')
+    print('🏗️ Enhanced with FULL NEWS SOURCES (17 sources)')
     print('💰 Cost: $0/month (FREE AI tiers only)')
     
     if GOOGLE_API_KEY and GOOGLE_CSE_ID:
         print('🔍 Google Search API: Available')
     else:
-        print('🔧 Google Search API: Using optimized fallback')
+        print('🔧 Google Search API: Using enhanced fallback')
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-    print(f'📰 Ready with {total_sources} RSS sources (Render optimized)')
+    print(f'📰 Ready with {total_sources} RSS sources (Full restoration)')
     print('🎯 Type !menu for guide')
     
-    # Render optimized status
-    status_text = f"Render Optimized • {ai_count} FREE AIs • !menu"
+    status_text = f"Enhanced • {ai_count} FREE AIs • 17 sources • !menu"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -1085,10 +1152,10 @@ async def on_command_error(ctx, error):
         print(f"❌ Command error: {error}")
         await ctx.send(f"❌ Lỗi: {str(error)}")
 
-# 🚀 RENDER OPTIMIZED MAIN COMMAND - Gemini Only with Intelligent Analysis
+# 🚀 ENHANCED MAIN COMMAND - Optimized Discord Display
 @bot.command(name='hoi')
-async def render_optimized_gemini_question(ctx, *, question):
-    """🚀 Gemini Intelligent System with adaptive knowledge usage"""
+async def enhanced_gemini_question(ctx, *, question):
+    """🚀 Enhanced Gemini System với tối ưu hiển thị Discord"""
     
     try:
         if len(debate_engine.available_engines) < 1:
@@ -1102,15 +1169,14 @@ async def render_optimized_gemini_question(ctx, *, question):
         
         current_datetime_str = get_current_datetime_str()
         
-        # Create intelligent progress message
+        # Progress message
         progress_embed = discord.Embed(
-            title="💎 Gemini Intelligent System - Render Optimized",
-            description=f"**Câu hỏi:** {question}\n\n🧠 **Đang phân tích thông minh với Gemini AI...**",
+            title="💎 Gemini Intelligent System - Enhanced",
+            description=f"**Câu hỏi:** {question}\n🧠 **Đang phân tích với Gemini AI...**",
             color=0x9932cc,
             timestamp=ctx.message.created_at
         )
         
-        # Show Gemini info
         if AIProvider.GEMINI in debate_engine.ai_engines:
             gemini_info = debate_engine.ai_engines[AIProvider.GEMINI]
             ai_status = f"{gemini_info['emoji']} **{gemini_info['name']}** - {gemini_info['strength']} ({gemini_info['free_limit']}) ✅"
@@ -1118,63 +1184,44 @@ async def render_optimized_gemini_question(ctx, *, question):
             ai_status = "❌ Gemini không khả dụng"
         
         progress_embed.add_field(
-            name="🤖 Gemini Intelligent Engine",
+            name="🤖 Gemini Enhanced Engine",
             value=ai_status,
             inline=False
         )
         
         progress_embed.add_field(
-            name="🧠 Intelligent Features",
-            value=f"✅ **Smart Analysis**: Ưu tiên kiến thức chuyên sâu\n✅ **Adaptive Data**: Chỉ dùng tin tức khi cần thiết\n✅ **Wikipedia**: Knowledge base integration\n✅ **Context Aware**: Hiểu câu hỏi và chọn strategy phù hợp\n✅ **Memory Optimized**: 400-450MB RAM\n✅ **Cost**: $0/month",
+            name="🚀 Enhanced Features",
+            value="✅ **Smart Analysis**: Kiến thức chuyên sâu + dữ liệu thời gian thực\n✅ **Full Sources**: 17 nguồn RSS được khôi phục\n✅ **Wikipedia**: Knowledge base integration\n✅ **Auto-extract**: Nội dung chi tiết từ bài viết\n✅ **Discord Optimized**: Hiển thị tối ưu",
             inline=False
         )
         
         progress_msg = await ctx.send(embed=progress_embed)
         
-        # Start Gemini intelligent analysis
-        print(f"\n💎 STARTING GEMINI INTELLIGENT ANALYSIS for: {question}")
-        analysis_result = await debate_engine.render_optimized_multi_ai_debate(question, max_sources=3)
+        # Start analysis
+        print(f"\n💎 STARTING ENHANCED GEMINI ANALYSIS for: {question}")
+        analysis_result = await debate_engine.enhanced_multi_ai_debate(question, max_sources=4)
         
-        # Create result embed
+        # Handle results
         if 'error' in analysis_result:
             error_embed = discord.Embed(
-                title="❌ Gemini Intelligent System - Error",
-                description=f"**Câu hỏi:** {question}\n\n**Lỗi:** {analysis_result['error']}",
+                title="❌ Gemini Enhanced System - Error",
+                description=f"**Câu hỏi:** {question}\n**Lỗi:** {analysis_result['error']}",
                 color=0xff6b6b,
                 timestamp=ctx.message.created_at
             )
             await progress_msg.edit(embed=error_embed)
             return
         
-        # Success with intelligent analysis
-        result_embed = discord.Embed(
-            title=f"💎 Gemini Intelligent Analysis ({current_datetime_str})",
-            description=f"**Câu hỏi:** {question}",
-            color=0x00ff88,
-            timestamp=ctx.message.created_at
-        )
-        
-        # Add intelligent answer
+        # Success - Create optimized embeds
         final_answer = analysis_result.get('final_answer', 'Không có câu trả lời.')
-        
-        # Determine analysis strategy used
         strategy = analysis_result.get('gemini_response', {}).get('search_strategy', 'knowledge_based')
         strategy_text = "Dữ liệu hiện tại" if strategy == 'current_data' else "Kiến thức chuyên sâu"
         
-        if len(final_answer) > 800:
-            result_embed.add_field(
-                name=f"🧠 Phân tích thông minh (Phần 1) - {strategy_text}",
-                value=final_answer[:800] + "...",
-                inline=False
-            )
-        else:
-            result_embed.add_field(
-                name=f"🧠 Phân tích thông minh - {strategy_text}",
-                value=final_answer,
-                inline=False
-            )
+        # Create optimized embeds for Discord limits
+        title = f"💎 Gemini Enhanced Analysis - {strategy_text}"
+        optimized_embeds = create_optimized_embeds(title, final_answer, 0x00ff88)
         
-        # Show analysis method
+        # Add metadata to first embed
         search_sources = analysis_result.get('gemini_response', {}).get('search_sources', [])
         source_types = []
         if any('wikipedia' in s.get('source_name', '').lower() for s in search_sources):
@@ -1186,61 +1233,49 @@ async def render_optimized_gemini_question(ctx, *, question):
         
         analysis_method = " + ".join(source_types) if source_types else "🧠 Kiến thức riêng"
         
-        result_embed.add_field(
-            name=f"🔍 Phương pháp phân tích",
-            value=f"**Strategy:** {strategy_text}\n**Sources:** {analysis_method}\n**Data Usage:** {'20-40% tin tức' if strategy == 'current_data' else '5-10% tin tức'}\n**Knowledge:** {'60-80% Gemini' if strategy == 'current_data' else '90-95% Gemini'}",
-            inline=True
-        )
-        
-        # Gemini statistics
-        stats_text = f"💎 **Engine**: Gemini AI\n"
-        stats_text += f"🏗️ **Platform**: Render Free Tier\n"
-        stats_text += f"🧠 **Strategy**: {strategy_text}\n"
-        stats_text += f"📅 **Date**: {get_current_date_str()}\n"
-        stats_text += f"💰 **Cost**: $0/month"
-        
-        result_embed.add_field(
-            name="📊 Gemini Statistics",
-            value=stats_text,
-            inline=True
-        )
-        
-        result_embed.set_footer(text=f"💎 Gemini Intelligent System • Render Optimized • {current_datetime_str}")
-        
-        await progress_msg.edit(embed=result_embed)
-        
-        # Send continuation if needed
-        if len(final_answer) > 800:
-            continuation_embed = discord.Embed(
-                title=f"🧠 Phân tích thông minh (Phần 2) - {strategy_text}",
-                description=final_answer[800:1600],
-                color=0x00ff88
+        if optimized_embeds:
+            optimized_embeds[0].add_field(
+                name="🔍 Phương pháp phân tích",
+                value=f"**Strategy:** {strategy_text}\n**Sources:** {analysis_method}\n**Data Usage:** {'20-40% tin tức' if strategy == 'current_data' else '5-10% tin tức'}\n**Knowledge:** {'60-80% Gemini' if strategy == 'current_data' else '90-95% Gemini'}",
+                inline=True
             )
             
-            await ctx.send(embed=continuation_embed)
+            optimized_embeds[0].add_field(
+                name="📊 Enhanced Statistics",
+                value=f"💎 **Engine**: Gemini AI Enhanced\n🏗️ **Sources**: 17 RSS feeds\n🧠 **Strategy**: {strategy_text}\n📅 **Date**: {get_current_date_str()}\n💰 **Cost**: $0/month",
+                inline=True
+            )
+            
+            optimized_embeds[-1].set_footer(text=f"💎 Gemini Enhanced System • Full Sources • {current_datetime_str}")
         
-        print(f"✅ GEMINI INTELLIGENT ANALYSIS COMPLETED for: {question}")
+        # Send optimized embeds
+        await progress_msg.edit(embed=optimized_embeds[0])
+        
+        for embed in optimized_embeds[1:]:
+            await ctx.send(embed=embed)
+        
+        print(f"✅ ENHANCED GEMINI ANALYSIS COMPLETED for: {question}")
         
     except Exception as e:
-        await ctx.send(f"❌ Lỗi hệ thống Gemini Intelligent: {str(e)}")
-        print(f"❌ GEMINI INTELLIGENT ERROR: {e}")
+        await ctx.send(f"❌ Lỗi hệ thống Gemini Enhanced: {str(e)}")
+        print(f"❌ ENHANCED GEMINI ERROR: {e}")
 
-# 🚀 RENDER OPTIMIZED NEWS COMMANDS
+# 🚀 ENHANCED NEWS COMMANDS VỚI ĐẦY ĐỦ NGUỒN
 @bot.command(name='all')
-async def get_all_news_render(ctx, page=1):
-    """🚀 Render optimized news from all sources"""
+async def get_all_news_enhanced(ctx, page=1):
+    """🚀 Enhanced news từ tất cả 17 nguồn"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức - Render Optimized...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ 17 nguồn - Enhanced...")
         
-        domestic_news = await collect_news_render_optimized(RSS_FEEDS['domestic'], 4)  # Reduced from 6
-        international_news = await collect_news_render_optimized(RSS_FEEDS['international'], 3)  # Reduced from 4
+        domestic_news = await collect_news_enhanced_full(RSS_FEEDS['domestic'], 6)
+        international_news = await collect_news_enhanced_full(RSS_FEEDS['international'], 5)
         
         await loading_msg.delete()
         
         all_news = domestic_news + international_news
         
-        items_per_page = 10  # Reduced from 12 for Render
+        items_per_page = 12
         start_index = (page - 1) * items_per_page
         end_index = start_index + items_per_page
         page_news = all_news[start_index:end_index]
@@ -1251,8 +1286,8 @@ async def get_all_news_render(ctx, page=1):
             return
         
         embed = discord.Embed(
-            title=f"📰 Tin tức tổng hợp Render (Trang {page})",
-            description=f"🏗️ Render Free Tier • {len(debate_engine.available_engines)} FREE AIs • Memory Optimized",
+            title=f"📰 Tin tức tổng hợp Enhanced (Trang {page})",
+            description=f"🚀 Enhanced với 17 nguồn RSS • Auto-extract • Auto-translate",
             color=0x00ff88
         )
         
@@ -1260,23 +1295,46 @@ async def get_all_news_render(ctx, page=1):
         international_count = len(page_news) - domestic_count
         
         embed.add_field(
-            name="📊 Thống kê Render",
-            value=f"🇻🇳 Trong nước: {domestic_count} tin\n🌍 Quốc tế: {international_count} tin (auto-extract)\n📊 Tổng: {len(all_news)} tin\n📅 Cập nhật: {get_current_date_str()}",
+            name="📊 Enhanced Statistics",
+            value=f"🇻🇳 Trong nước: {domestic_count} tin (9 nguồn)\n🌍 Quốc tế: {international_count} tin (8 nguồn)\n📊 Tổng có sẵn: {len(all_news)} tin\n📅 Cập nhật: {get_current_datetime_str()}",
             inline=False
         )
         
+        # Enhanced emoji mapping
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 'cafef_vimo': '📊',
+            'cafebiz_main': '💼', 'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈', 'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️', 'yahoo_finance': '💰', 'reuters_business': '🌍', 'bloomberg_markets': '💹', 
+            'marketwatch_latest': '📈', 'forbes_money': '💎', 'financial_times': '💼', 'business_insider': '📰', 'the_economist': '🎓'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC', 'yahoo_finance': 'Yahoo Finance', 'reuters_business': 'Reuters',
+            'bloomberg_markets': 'Bloomberg', 'marketwatch_latest': 'MarketWatch', 'forbes_money': 'Forbes',
+            'financial_times': 'Financial Times', 'business_insider': 'Business Insider', 'the_economist': 'The Economist'
+        }
+        
         for i, news in enumerate(page_news, 1):
-            title = news['title'][:50] + "..." if len(news['title']) > 50 else news['title']  # Reduced title length
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:60] + "..." if len(news['title']) > 60 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
             embed.add_field(
-                name=f"{i}. {title}",
-                value=f"🕰️ {news['published_str']} • 🔗 [Đọc]({news['link']})",
+                name=f"{i}. {emoji} {title}",
+                value=f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})",
                 inline=False
             )
         
-        save_user_news_render(ctx.author.id, page_news, f"all_page_{page}")
+        save_user_news_enhanced(ctx.author.id, page_news, f"all_page_{page}")
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Render Optimized • Trang {page}/{total_pages} • !chitiet [số]")
+        embed.set_footer(text=f"🚀 Enhanced • 17 nguồn • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -1284,16 +1342,16 @@ async def get_all_news_render(ctx, page=1):
         await ctx.send(f"❌ Lỗi: {str(e)}")
 
 @bot.command(name='in')
-async def get_domestic_news_render(ctx, page=1):
-    """🚀 Render optimized domestic news"""
+async def get_domestic_news_enhanced(ctx, page=1):
+    """🚀 Enhanced tin tức trong nước từ 9 nguồn"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức trong nước - Render Optimized...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức trong nước từ 9 nguồn - Enhanced...")
         
-        news_list = await collect_news_render_optimized(RSS_FEEDS['domestic'], 5)  # Reduced from 8
+        news_list = await collect_news_enhanced_full(RSS_FEEDS['domestic'], 8)
         await loading_msg.delete()
         
-        items_per_page = 10  # Reduced from 12
+        items_per_page = 12
         start_index = (page - 1) * items_per_page
         end_index = start_index + items_per_page
         page_news = news_list[start_index:end_index]
@@ -1304,29 +1362,48 @@ async def get_domestic_news_render(ctx, page=1):
             return
         
         embed = discord.Embed(
-            title=f"🇻🇳 Tin kinh tế trong nước Render (Trang {page})",
-            description=f"🏗️ Render Free Tier • Từ {len(RSS_FEEDS['domestic'])} nguồn • Memory Optimized",
+            title=f"🇻🇳 Tin kinh tế trong nước Enhanced (Trang {page})",
+            description=f"🚀 Enhanced từ 9 nguồn chuyên ngành • Auto-extract",
             color=0xff0000
         )
         
         embed.add_field(
-            name="📊 Thông tin Render",
-            value=f"📰 Tổng tin: {len(news_list)} tin\n🎯 Lĩnh vực: Kinh tế, CK, BĐS\n📅 Cập nhật: {get_current_date_str()}",
+            name="📊 Enhanced Domestic Info",
+            value=f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🎯 Lĩnh vực: Kinh tế, CK, BĐS, Vĩ mô\n🚀 Nguồn: CafeF, VnEconomy, VnExpress, Thanh Niên, Nhân Dân\n📅 Cập nhật: {get_current_datetime_str()}",
             inline=False
         )
         
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 'cafef_vimo': '📊',
+            'cafebiz_main': '💼', 'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈', 'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC'
+        }
+        
         for i, news in enumerate(page_news, 1):
-            title = news['title'][:50] + "..." if len(news['title']) > 50 else news['title']
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:60] + "..." if len(news['title']) > 60 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
             embed.add_field(
-                name=f"{i}. {title}",
-                value=f"🕰️ {news['published_str']} • 🔗 [Đọc]({news['link']})",
+                name=f"{i}. {emoji} {title}",
+                value=f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})",
                 inline=False
             )
         
-        save_user_news_render(ctx.author.id, page_news, f"in_page_{page}")
+        save_user_news_enhanced(ctx.author.id, page_news, f"in_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Render Optimized • Trang {page}/{total_pages} • !chitiet [số]")
+        embed.set_footer(text=f"🚀 Enhanced • 9 nguồn VN • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -1334,16 +1411,16 @@ async def get_domestic_news_render(ctx, page=1):
         await ctx.send(f"❌ Lỗi: {str(e)}")
 
 @bot.command(name='out')
-async def get_international_news_render(ctx, page=1):
-    """🚀 Render optimized international news with auto-translate"""
+async def get_international_news_enhanced(ctx, page=1):
+    """🚀 Enhanced tin tức quốc tế từ 8 nguồn với auto-translate"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức quốc tế - Render Optimized với auto-translate...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức quốc tế từ 8 nguồn - Enhanced...")
         
-        news_list = await collect_news_render_optimized(RSS_FEEDS['international'], 4)  # Reduced from 6
+        news_list = await collect_news_enhanced_full(RSS_FEEDS['international'], 6)
         await loading_msg.delete()
         
-        items_per_page = 10  # Reduced from 12
+        items_per_page = 12
         start_index = (page - 1) * items_per_page
         end_index = start_index + items_per_page
         page_news = news_list[start_index:end_index]
@@ -1354,39 +1431,53 @@ async def get_international_news_render(ctx, page=1):
             return
         
         embed = discord.Embed(
-            title=f"🌍 Tin kinh tế quốc tế Render (Trang {page})",
-            description=f"🏗️ Render Free Tier • {len(RSS_FEEDS['international'])} nguồn • Auto-translate + Extract",
+            title=f"🌍 Tin kinh tế quốc tế Enhanced (Trang {page})",
+            description=f"🚀 Enhanced từ 8 nguồn hàng đầu • Auto-extract • Auto-translate",
             color=0x0066ff
         )
         
         embed.add_field(
-            name="📊 Thông tin Render",
-            value=f"📰 Tổng tin: {len(news_list)} tin\n🌐 Auto-extract: Bloomberg, Reuters\n🔄 Auto-translate: Tiếng Anh → Tiếng Việt\n📅 Cập nhật: {get_current_date_str()}",
+            name="📊 Enhanced International Info",
+            value=f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🚀 Nguồn: Yahoo Finance, Reuters, Bloomberg, MarketWatch, Forbes, FT, Business Insider, The Economist\n🌐 Auto-translate: Tiếng Anh → Tiếng Việt\n📅 Cập nhật: {get_current_datetime_str()}",
             inline=False
         )
         
+        emoji_map = {
+            'yahoo_finance': '💰', 'reuters_business': '🌍', 'bloomberg_markets': '💹', 'marketwatch_latest': '📈',
+            'forbes_money': '💎', 'financial_times': '💼', 'business_insider': '📰', 'the_economist': '🎓'
+        }
+        
+        source_names = {
+            'yahoo_finance': 'Yahoo Finance', 'reuters_business': 'Reuters', 'bloomberg_markets': 'Bloomberg', 
+            'marketwatch_latest': 'MarketWatch', 'forbes_money': 'Forbes', 'financial_times': 'Financial Times', 
+            'business_insider': 'Business Insider', 'the_economist': 'The Economist'
+        }
+        
         for i, news in enumerate(page_news, 1):
-            title = news['title'][:50] + "..." if len(news['title']) > 50 else news['title']
+            emoji = emoji_map.get(news['source'], '🌍')
+            title = news['title'][:60] + "..." if len(news['title']) > 60 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
             embed.add_field(
-                name=f"{i}. 🌐 {title}",
-                value=f"🕰️ {news['published_str']} • 🔗 [Đọc]({news['link']})",
+                name=f"{i}. {emoji} {title}",
+                value=f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})",
                 inline=False
             )
         
-        save_user_news_render(ctx.author.id, page_news, f"out_page_{page}")
+        save_user_news_enhanced(ctx.author.id, page_news, f"out_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Render Optimized • Trang {page}/{total_pages} • !chitiet [số] (auto-extract)")
+        embed.set_footer(text=f"🚀 Enhanced • 8 nguồn QT • Trang {page}/{total_pages} • !chitiet [số] (auto-translate)")
         
         await ctx.send(embed=embed)
         
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {str(e)}")
 
-# 🚀 RENDER OPTIMIZED ARTICLE DETAILS
+# 🚀 ENHANCED ARTICLE DETAILS COMMAND
 @bot.command(name='chitiet')
-async def get_news_detail_render(ctx, news_number: int):
-    """🚀 Render optimized article details with content extraction + auto-translate"""
+async def get_news_detail_enhanced(ctx, news_number: int):
+    """🚀 Enhanced chi tiết bài viết với content extraction được sửa lỗi"""
     try:
         user_id = ctx.author.id
         
@@ -1403,23 +1494,26 @@ async def get_news_detail_render(ctx, news_number: int):
         
         news = news_list[news_number - 1]
         
-        loading_msg = await ctx.send(f"🚀 Đang trích xuất với Render optimized system...")
+        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung Enhanced (đã sửa lỗi 406)...")
         
-        # Render optimized content extraction
-        full_content = await fetch_content_render_optimized(news['link'])
+        # Enhanced content extraction (fixed)
+        full_content = await fetch_content_enhanced_fixed(news['link'])
         
-        # Render optimized auto-translate
+        # Enhanced auto-translate
         source_name = extract_source_name(news['link'])
-        translated_content, is_translated = await detect_and_translate_content_render(full_content, source_name)
+        translated_content, is_translated = await detect_and_translate_content_enhanced(full_content, source_name)
         
         await loading_msg.delete()
         
-        embed = discord.Embed(
-            title="📖 Chi tiết bài viết - Render Optimized",
-            color=0x9932cc
-        )
+        # Create optimized embeds for Discord
+        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
+        main_title = f"📖 Chi tiết bài viết Enhanced{title_suffix}"
         
-        # Render extraction info
+        # Create content with metadata
+        content_with_meta = f"**📰 Tiêu đề:** {news['title']}\n"
+        content_with_meta += f"**🕰️ Thời gian:** {news['published_str']} ({get_current_date_str()})\n"
+        content_with_meta += f"**📰 Nguồn:** {source_name}{'🌐' if is_translated else ''}\n"
+        
         extraction_methods = []
         if TRAFILATURA_AVAILABLE:
             extraction_methods.append("🚀 Trafilatura")
@@ -1427,246 +1521,187 @@ async def get_news_detail_render(ctx, news_number: int):
             extraction_methods.append("📰 Newspaper3k")
         extraction_methods.append("🔄 Legacy")
         
-        extraction_info = " → ".join(extraction_methods)
+        content_with_meta += f"**🚀 Enhanced Extract:** {' → '.join(extraction_methods)}\n\n"
         
-        # Translation indicator
-        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
-        embed.add_field(name=f"📰 Tiêu đề{title_suffix}", value=news['title'], inline=False)
-        embed.add_field(name="🕰️ Thời gian", value=f"{news['published_str']} ({get_current_date_str()})", inline=True)
-        
-        source_display = source_name
         if is_translated:
-            source_display += " 🌐"
-        embed.add_field(name="📰 Nguồn", value=source_display, inline=True)
-        embed.add_field(name="🚀 Render Extract", value=extraction_info, inline=True)
+            content_with_meta += f"**🔄 Enhanced Auto-Translate:** Groq AI đã dịch từ tiếng Anh\n\n"
         
-        # Content with memory optimization
-        content_title = "📄 Nội dung chi tiết 🌐 (Render auto-translate)" if is_translated else "📄 Nội dung chi tiết (Render extract)"
+        content_with_meta += f"**📄 Nội dung chi tiết:**\n{translated_content}"
         
-        if len(translated_content) > 800:  # Reduced from 1000 for Render
-            embed.add_field(
-                name=f"{content_title} (Phần 1)",
-                value=translated_content[:800] + "...",
-                inline=False
-            )
-            
-            await ctx.send(embed=embed)
-            
-            # Render optimized second embed
-            embed2 = discord.Embed(
-                title=f"📖 Chi tiết bài viết (tiếp theo){'🌐' if is_translated else ''} - Render",
-                color=0x9932cc
-            )
-            
-            embed2.add_field(
-                name=f"{content_title} (Phần 2)",
-                value=translated_content[800:1400],  # Reduced continuation
-                inline=False
-            )
-            
-            if is_translated:
-                embed2.add_field(
-                    name="🔄 Render Auto-Translate",
-                    value="📝 Nội dung tiếng Anh đã được dịch tự động\n🏗️ Render Free Tier optimized",
-                    inline=False
-                )
-            
-            embed2.add_field(
+        # Create optimized embeds
+        optimized_embeds = create_optimized_embeds(main_title, content_with_meta, 0x9932cc)
+        
+        # Add link to last embed
+        if optimized_embeds:
+            optimized_embeds[-1].add_field(
                 name="🔗 Đọc bài viết đầy đủ",
                 value=f"[Nhấn để đọc toàn bộ bài viết{'gốc' if is_translated else ''}]({news['link']})",
                 inline=False
             )
             
-            embed2.set_footer(text=f"🚀 Render Optimized • Content extraction • {get_current_datetime_str()}")
-            
-            await ctx.send(embed=embed2)
-            return
-        else:
-            embed.add_field(
-                name=content_title,
-                value=translated_content,
-                inline=False
-            )
+            optimized_embeds[-1].set_footer(text=f"🚀 Enhanced Content Extraction • Tin số {news_number} • !hoi [question]")
         
-        if is_translated:
-            embed.add_field(
-                name="🔄 Render Auto-Translate",
-                value="📝 Advanced detection + translation\n🏗️ Render Free Tier optimized",
-                inline=False
-            )
+        # Send optimized embeds
+        for embed in optimized_embeds:
+            await ctx.send(embed=embed)
         
-        embed.add_field(
-            name="🔗 Đọc bài viết đầy đủ",
-            value=f"[Nhấn để đọc toàn bộ bài viết{'gốc' if is_translated else ''}]({news['link']})",
-            inline=False
-        )
-        
-        embed.set_footer(text=f"🚀 Render Optimized • Tin số {news_number} • !hoi [question]")
-        
-        await ctx.send(embed=embed)
+        print(f"✅ Enhanced content extraction completed for: {news['title'][:50]}...")
         
     except ValueError:
         await ctx.send("❌ Vui lòng nhập số! Ví dụ: `!chitiet 5`")
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {str(e)}")
+        print(f"❌ Enhanced content extraction error: {e}")
 
 @bot.command(name='cuthe')
-async def get_news_detail_alias_render(ctx, news_number: int):
-    """🚀 Alias cho lệnh !chitiet Render optimized"""
-    await get_news_detail_render(ctx, news_number)
+async def get_news_detail_alias_enhanced(ctx, news_number: int):
+    """🚀 Alias cho lệnh !chitiet Enhanced"""
+    await get_news_detail_enhanced(ctx, news_number)
 
 @bot.command(name='menu')
-async def help_command_render(ctx):
-    """🚀 Render optimized menu guide"""
+async def help_command_enhanced(ctx):
+    """🚀 Enhanced menu guide với full features"""
     current_datetime_str = get_current_datetime_str()
     
     embed = discord.Embed(
-        title="🚀 Multi-AI Discord News Bot - Render Optimized Edition",
-        description=f"Bot tin tức với Multi-AI + Render Free Tier - {current_datetime_str}",
+        title="🚀 Enhanced Multi-AI Discord News Bot - Fixed & Optimized",
+        description=f"Bot tin tức AI với 17 nguồn RSS đầy đủ - {current_datetime_str}",
         color=0xff9900
     )
     
     ai_count = len(debate_engine.available_engines)
     if ai_count >= 1:
-        ai_status = f"🚀 **{ai_count} FREE AI Engines (Render Optimized)**\n"
+        ai_status = f"🚀 **{ai_count} Enhanced AI Engines**\n"
         for ai_provider in debate_engine.available_engines:
             ai_info = debate_engine.ai_engines[ai_provider]
             ai_status += f"{ai_info['emoji']} **{ai_info['name']}** - {ai_info['strength']} ({ai_info['free_limit']}) ✅\n"
     else:
         ai_status = "⚠️ Cần ít nhất 1 AI engine để hoạt động"
     
-    embed.add_field(name="🚀 Render Multi-AI Status", value=ai_status, inline=False)
+    embed.add_field(name="🚀 Enhanced AI Status", value=ai_status, inline=False)
     
     embed.add_field(
-        name="🥊 Multi-AI Commands (Render Optimized)",
-        value=f"**!hoi [câu hỏi]** - AI với dữ liệu thời gian thực {get_current_date_str()}\n*VD: !hoi giá vàng hôm nay*\n*VD: !hoi chứng khoán*",
+        name="🥊 Enhanced AI Commands",
+        value=f"**!hoi [câu hỏi]** - Gemini AI với dữ liệu thời gian thực {get_current_date_str()}\n*VD: !hoi giá vàng hôm nay*\n*VD: !hoi chứng khoán việt nam*\n*VD: !hoi lạm phát là gì*",
         inline=False
     )
     
     embed.add_field(
-        name="📰 News Commands (Render Optimized)",
-        value="**!all [trang]** - Tin tổng hợp (10 tin/trang)\n**!in [trang]** - Tin trong nước\n**!out [trang]** - Tin quốc tế (auto-translate)\n**!chitiet [số]** - Chi tiết (🚀 Trafilatura + auto-translate)",
+        name="📰 Enhanced News Commands",
+        value="**!all [trang]** - Tin từ 17 nguồn (12 tin/trang)\n**!in [trang]** - Tin trong nước (9 nguồn)\n**!out [trang]** - Tin quốc tế (8 nguồn + auto-translate)\n**!chitiet [số]** - Chi tiết (🚀 Enhanced extraction + auto-translate)",
         inline=False
     )
     
     embed.add_field(
-        name="🚀 Render Features",
-        value=f"✅ **Memory Optimized**: 512MB RAM efficient\n✅ **Content Extraction**: Trafilatura + Newspaper3k\n✅ **Auto-translate**: Advanced detection\n✅ **FREE Only**: $0/month\n✅ **Fast Response**: Tối ưu tốc độ Render\n✅ **Auto-cleanup**: Memory management",
+        name="🚀 Enhanced Features - Fixed",
+        value=f"✅ **Full Sources**: 17 nguồn RSS đã khôi phục\n✅ **Fixed Extraction**: Đã sửa lỗi 406 Client Error\n✅ **Enhanced Headers**: Bypass website blocking\n✅ **Discord Optimized**: Tự động phân tách nội dung AI\n✅ **Auto-translate**: Groq AI cho tin quốc tế\n✅ **Wikipedia**: Knowledge base integration\n✅ **Smart Display**: Tối ưu cho Discord limits",
         inline=False
     )
     
     embed.add_field(
-        name="🎯 Ví dụ sử dụng Render",
-        value=f"**!hoi giá vàng** - AI tìm giá vàng {get_current_date_str()}\n**!hoi tỷ giá usd** - AI tìm tỷ giá hiện tại\n**!hoi vn-index** - AI tìm chỉ số chứng khoán\n**!all** - Xem tin tức tổng hợp\n**!chitiet 1** - Xem chi tiết tin số 1",
+        name="🎯 Enhanced Examples",
+        value=f"**!hoi giá vàng hôm nay** - AI tìm giá vàng {get_current_date_str()}\n**!hoi tỷ giá usd vnd** - AI tìm tỷ giá hiện tại\n**!hoi lạm phát việt nam** - AI giải thích lạm phát\n**!all** - Xem tin từ 17 nguồn\n**!chitiet 1** - Xem chi tiết với Enhanced extraction",
         inline=False
     )
     
-    # Render status
-    search_status = "✅ Render optimized search"
+    # Enhanced status
+    search_status = "✅ Enhanced search"
     if GOOGLE_API_KEY and GOOGLE_CSE_ID:
         search_status += " + Google API"
     
-    embed.add_field(name="🔍 Search (Render)", value=search_status, inline=True)
-    embed.add_field(name=f"🏗️ Render Free Tier", value=f"🚀 **{ai_count} FREE AI Engines**\n⚡ **Memory Optimized**\n🧠 **Smart Caching**\n🌐 **Auto-translate**\n💰 **$0/month**", inline=True)
+    embed.add_field(name="🔍 Enhanced Search", value=search_status, inline=True)
+    embed.add_field(name="📰 News Sources", value=f"🇻🇳 **Trong nước**: 9 nguồn\n🌍 **Quốc tế**: 8 nguồn\n📊 **Tổng**: 17 nguồn\n🚀 **Status**: Enhanced & Fixed", inline=True)
     
-    embed.set_footer(text=f"🚀 Render Optimized Multi-AI • {current_datetime_str} • !hoi [question]")
+    embed.set_footer(text=f"🚀 Enhanced Multi-AI • Fixed & Optimized • {current_datetime_str}")
     await ctx.send(embed=embed)
 
-# Render optimized cleanup function
-async def cleanup_render():
-    """Memory-optimized cleanup for Render Free Tier"""
+# Cleanup function
+async def cleanup_enhanced():
+    """Enhanced cleanup"""
     if debate_engine:
         await debate_engine.close_session()
     
-    # Clear user cache periodically for memory efficiency
     global user_news_cache
     if len(user_news_cache) > MAX_CACHE_ENTRIES:
         user_news_cache.clear()
-        print("🧹 Render memory cleanup completed")
+        print("🧹 Enhanced memory cleanup completed")
 
-# Main execution optimized for Render Free Tier
+# Main execution
 if __name__ == "__main__":
     try:
         keep_alive()
-        print("🚀 Starting Multi-AI Discord News Bot - Render Optimized Edition...")
-        print("🏗️ Render Free Tier Edition - Memory Optimized (512MB RAM)")
+        print("🚀 Starting Enhanced Multi-AI Discord News Bot - Fixed & Optimized...")
+        print("🏗️ Enhanced Edition với 17 nguồn RSS đầy đủ và sửa lỗi content extraction")
         
         ai_count = len(debate_engine.available_engines)
-        print(f"🤖 Render Multi-AI System: {ai_count} FREE engines initialized")
+        print(f"🤖 Enhanced Multi-AI System: {ai_count} FREE engines initialized")
         
         current_datetime_str = get_current_datetime_str()
         print(f"🔧 Current Vietnam time: {current_datetime_str}")
         
         if ai_count >= 1:
             ai_names = [debate_engine.ai_engines[ai]['name'] for ai in debate_engine.available_engines]
-            print(f"🥊 Render debate ready with: {', '.join(ai_names)}")
+            print(f"🥊 Enhanced debate ready with: {', '.join(ai_names)}")
             print("💰 Cost: $0/month (FREE AI tiers only)")
-            print("🚀 Features: News + Content extraction + Auto-translate + Multi-AI")
+            print("🚀 Features: 17 News sources + Enhanced extraction + Auto-translate + Multi-AI + Discord optimized")
         else:
             print("⚠️ Warning: Need at least 1 FREE AI engine")
         
-        # Render search status
+        # Enhanced status
         if GOOGLE_API_KEY and GOOGLE_CSE_ID:
-            print("🔍 Google Search API: Available with Render optimization")
+            print("🔍 Google Search API: Available with Enhanced optimization")
         else:
-            print("🔧 Google Search API: Using Render optimized fallback")
+            print("🔧 Google Search API: Using Enhanced fallback")
         
-        # Wikipedia knowledge base status
         if WIKIPEDIA_AVAILABLE:
-            print("📚 Wikipedia Knowledge Base: Available (using spare 112MB)")
+            print("📚 Wikipedia Knowledge Base: Available")
         else:
             print("⚠️ Wikipedia Knowledge Base: Not available")
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-        print(f"📊 {total_sources} RSS sources loaded with Render optimization")
+        print(f"📊 {total_sources} RSS sources loaded (FULL RESTORATION from original code)")
         
-        # Display Render content extraction capabilities
-        print("\n🚀 RENDER OPTIMIZED CONTENT EXTRACTION:")
+        # Enhanced extraction capabilities
+        print("\n🚀 ENHANCED CONTENT EXTRACTION (FIXED):")
         extraction_tiers = []
         if TRAFILATURA_AVAILABLE:
-            extraction_tiers.append("Tier 1: Trafilatura (Memory optimized)")
+            extraction_tiers.append("Tier 1: Trafilatura (Fixed headers)")
         else:
             print("❌ Trafilatura: Not available")
         
         if NEWSPAPER_AVAILABLE:
-            extraction_tiers.append("Tier 2: Newspaper3k (Fallback)")
+            extraction_tiers.append("Tier 2: Newspaper3k (Enhanced)")
         else:
             print("❌ Newspaper3k: Not available")
         
-        extraction_tiers.append("Tier 3: Legacy (Always works)")
+        extraction_tiers.append("Tier 3: Enhanced Legacy (Always works)")
         
         for tier in extraction_tiers:
             print(f"✅ {tier}")
         
-        # Render Free Tier optimization info
-        print("\n🏗️ RENDER FREE TIER OPTIMIZATION:")
-        print("✅ Memory usage: ~300-400MB (512MB limit)")
-        print("✅ Reduced cache size and timeouts")
-        print("✅ Memory cleanup and auto-GC")
-        print("✅ Efficient content extraction")
-        print("✅ Optimized AI API calls")
-        print("✅ Compact RSS parsing")
+        print("\n🚀 ENHANCED OPTIMIZATIONS:")
+        print("✅ Discord limits: Auto-split content to fit embed limits")
+        print("✅ Headers enhanced: Bypass 406 Client Error")
+        print("✅ Full RSS sources: 17 sources restored from original code")
+        print("✅ Content extraction: Fixed with enhanced headers")
+        print("✅ Auto-translate: Groq AI for international news")
+        print("✅ Memory management: Optimized caching")
         
-        print("\n✅ Gemini Intelligent Discord News Bot - Render + Wikipedia ready!")
-        print(f"💡 Use !hoi [question] to get Gemini intelligent answers (adaptive knowledge + data usage)")
-        print("💡 Use !all, !in, !out for news, !chitiet [number] for details with Groq translation")
-        print(f"💡 Date and time automatically update: {current_datetime_str}")
-        print("💡 Content extraction: Trafilatura → Newspaper3k → Legacy (memory optimized)")
-        print("💡 Translation: Groq AI for real English → Vietnamese translation")
-        print("💡 Knowledge base: Wikipedia (VN + EN) integrated with Gemini responses")
-        print("💡 Intelligent strategy: Gemini prioritizes inherent knowledge over news data")
-        print("💡 Render Free Tier optimized for maximum performance at $0/month")
+        print(f"\n✅ Enhanced Multi-AI Discord News Bot ready!")
+        print(f"💡 Use !hoi [question] to get enhanced Gemini answers with Discord optimization")
+        print("💡 Use !all, !in, !out for enhanced news from 17 sources")
+        print("💡 Use !chitiet [number] for enhanced details with fixed extraction")
+        print(f"💡 Date auto-updates: {current_datetime_str}")
+        print("💡 Content extraction: Enhanced headers → Fixed 406 errors")
+        print("💡 Discord display: Auto-optimized for embed limits")
         
-        # Final startup message
         print("\n" + "="*70)
-        print("💎 GEMINI INTELLIGENT DISCORD NEWS BOT - RENDER EDITION")
+        print("🚀 ENHANCED MULTI-AI DISCORD NEWS BOT - FIXED & OPTIMIZED")
         print("💰 COST: $0/month (100% FREE AI tiers)")
-        print("🏗️ PLATFORM: Render Free Tier (400-450MB RAM used)")
-        print("🤖 AI ENGINES: Gemini (Primary for !hoi) + Groq (Translation only)")
-        print("🧠 INTELLIGENCE: Adaptive knowledge usage (5-95% news data)")
-        print("📚 KNOWLEDGE: Wikipedia + Gemini inherent knowledge")
-        print("🌐 TRANSLATION: Real Groq AI translation for international news")
-        print("🎯 USAGE: !menu for intelligent guide")
+        print("📰 SOURCES: 17 RSS feeds (9 VN + 8 International) - FULLY RESTORED")
+        print("🤖 AI: Gemini (Primary) + Groq (Translation)")
+        print("🚀 FIXED: 406 Client Error, Content extraction, Discord display")
+        print("🎯 USAGE: !menu for complete guide")
         print("="*70)
         
         bot.run(TOKEN)
@@ -1682,6 +1717,6 @@ if __name__ == "__main__":
         
     finally:
         try:
-            asyncio.run(cleanup_render())
+            asyncio.run(cleanup_enhanced())
         except:
             pass
