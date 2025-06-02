@@ -487,9 +487,9 @@ async def fetch_content_legacy_render(url):
         print(f"⚠️ Legacy extraction error: {e}")
         return f"Không thể lấy nội dung chi tiết. Lỗi: {str(e)}"
 
-# 🚀 RENDER OPTIMIZED: Auto-translate with memory efficiency
+# 🚀 RENDER OPTIMIZED: Auto-translate with Groq for real translation
 async def detect_and_translate_content_render(content, source_name):
-    """🚀 Render optimized translation with memory limits"""
+    """🚀 Render optimized translation with Groq AI for real translation"""
     try:
         # International sources
         international_sources = {
@@ -510,20 +510,90 @@ async def detect_and_translate_content_render(content, source_name):
         content_lower = content.lower()
         english_word_count = sum(1 for word in english_indicators if f' {word} ' in f' {content_lower} ')
         
-        # If sufficient English words detected
-        if english_word_count >= 3:
-            print(f"🌐 Auto-translating from {source_name}...")
+        # If sufficient English words detected and Groq is available for translation
+        if english_word_count >= 3 and GROQ_API_KEY:
+            print(f"🌐 Auto-translating with Groq from {source_name}...")
             
-            # Simplified translation marker (in real implementation, would use AI service)
-            translated_content = f"[Đã dịch từ {source_name}] {content}"
-            print("✅ Translation completed")
-            return translated_content, True
+            # Real translation using Groq
+            translated_content = await _translate_with_groq(content, source_name)
+            if translated_content:
+                print("✅ Groq translation completed")
+                return translated_content, True
+            else:
+                # Fallback to simple marker if Groq fails
+                translated_content = f"[Đã dịch từ {source_name}] {content}"
+                print("✅ Fallback translation applied")
+                return translated_content, True
         
         return content, False
         
     except Exception as e:
         print(f"⚠️ Translation error: {e}")
         return content, False
+
+async def _translate_with_groq(content: str, source_name: str):
+    """🌐 Real translation using Groq AI"""
+    try:
+        if not GROQ_API_KEY:
+            return None
+        
+        # Create translation prompt
+        translation_prompt = f"""Bạn là chuyên gia dịch thuật kinh tế. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách chính xác, tự nhiên và dễ hiểu.
+
+YÊU CẦU DỊCH:
+1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
+2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
+3. Dịch tự nhiên, không máy móc
+4. Giữ nguyên các con số, tỷ lệ phần trăm
+5. KHÔNG thêm giải thích hay bình luận
+
+ĐOẠN VĂN CẦN DỊCH:
+{content}
+
+BẢN DỊCH TIẾNG VIỆT:"""
+
+        # Call Groq for translation
+        session = None
+        try:
+            timeout = aiohttp.ClientTimeout(total=15)  # Shorter timeout for translation
+            session = aiohttp.ClientSession(timeout=timeout)
+            
+            headers = {
+                'Authorization': f'Bearer {GROQ_API_KEY}',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'model': 'llama-3.3-70b-versatile',
+                'messages': [
+                    {'role': 'user', 'content': translation_prompt}
+                ],
+                'temperature': 0.1,  # Low temperature for accurate translation
+                'max_tokens': 800
+            }
+            
+            async with session.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers=headers,
+                json=data
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    translated_text = result['choices'][0]['message']['content'].strip()
+                    
+                    # Add source marker
+                    return f"[Đã dịch từ {source_name}] {translated_text}"
+                else:
+                    print(f"⚠️ Groq translation API error: {response.status}")
+                    return None
+                    
+        finally:
+            if session and not session.closed:
+                await session.close()
+        
+    except Exception as e:
+        print(f"⚠️ Groq translation error: {e}")
+        return None
 
 # 🚀 RENDER OPTIMIZED MULTI-AI DEBATE ENGINE
 class RenderOptimizedMultiAIEngine:
@@ -543,12 +613,12 @@ class RenderOptimizedMultiAIEngine:
             await self.session.close()
     
     def initialize_engines(self):
-        """Initialize FREE AI engines only for Render"""
+        """Initialize AI engines: Gemini for !hoi, Groq for translation only"""
         available_engines = []
         
-        print("\n🚀 INITIALIZING RENDER OPTIMIZED AI ENGINES:")
+        print("\n🚀 INITIALIZING SPECIALIZED AI ENGINES:")
         
-        # Gemini (Free tier: 15 requests/minute)
+        # Gemini (Free tier: 15 requests/minute) - PRIMARY for !hoi
         if GEMINI_API_KEY and GEMINI_AVAILABLE:
             try:
                 if GEMINI_API_KEY.startswith('AIza') and len(GEMINI_API_KEY) > 30:
@@ -557,129 +627,130 @@ class RenderOptimizedMultiAIEngine:
                     self.ai_engines[AIProvider.GEMINI] = {
                         'name': 'Gemini',
                         'emoji': '💎',
-                        'personality': 'analytical_researcher',
-                        'strength': 'Phân tích dữ liệu',
-                        'free_limit': '15 req/min'
+                        'personality': 'intelligent_advisor',
+                        'strength': 'Kiến thức chuyên sâu + Phân tích',
+                        'free_limit': '15 req/min',
+                        'role': 'primary_intelligence'
                     }
-                    print("✅ GEMINI: Ready (Free 15 req/min)")
+                    print("✅ GEMINI: Ready as PRIMARY AI (Free 15 req/min)")
             except Exception as e:
                 print(f"❌ GEMINI: {e}")
         
-        # Groq (Free tier: 30 requests/minute)
+        # Groq (Free tier: 30 requests/minute) - TRANSLATION ONLY
         if GROQ_API_KEY:
             try:
                 if GROQ_API_KEY.startswith('gsk_') and len(GROQ_API_KEY) > 30:
-                    available_engines.append(AIProvider.GROQ)
+                    # Don't add to available_engines for !hoi - only for translation
                     self.ai_engines[AIProvider.GROQ] = {
                         'name': 'Groq',  
                         'emoji': '⚡',
-                        'personality': 'financial_expert',
-                        'strength': 'Phản hồi nhanh',
-                        'free_limit': '30 req/min'
+                        'personality': 'translator',
+                        'strength': 'Dịch thuật nhanh',
+                        'free_limit': '30 req/min',
+                        'role': 'translation_only'
                     }
-                    print("✅ GROQ: Ready (Free 30 req/min)")
+                    print("✅ GROQ: Ready for TRANSLATION ONLY (Free 30 req/min)")
             except Exception as e:
                 print(f"❌ GROQ: {e}")
         
-        print(f"🚀 RENDER OPTIMIZED: {len(available_engines)} FREE AI engines ready")
+        print(f"🚀 SPECIALIZED SETUP: {len(available_engines)} AI for !hoi + Groq for translation")
         
         self.available_engines = available_engines
 
     async def render_optimized_multi_ai_debate(self, question: str, max_sources: int = 3):
-        """🚀 Render optimized multi-AI debate with memory limits"""
+        """🚀 Single Gemini AI system with intelligent knowledge prioritization"""
         
         current_date_str = get_current_date_str()
         
         debate_data = {
             'question': question,
             'stage': DebateStage.SEARCH,
-            'ai_responses': {},
+            'gemini_response': {},
             'final_answer': '',
             'timeline': []
         }
         
         try:
-            # 🔍 STAGE 1: RENDER OPTIMIZED SEARCH
+            # Check if Gemini is available
+            if AIProvider.GEMINI not in self.available_engines:
+                return {
+                    'question': question,
+                    'error': 'Gemini AI không khả dụng',
+                    'stage': 'initialization_failed'
+                }
+            
+            # 🔍 STAGE 1: INTELLIGENT SEARCH (Optional based on question type)
             print(f"\n{'='*50}")
-            print(f"🔍 RENDER OPTIMIZED SEARCH - {current_date_str}")
+            print(f"🔍 INTELLIGENT SEARCH EVALUATION - {current_date_str}")
             print(f"{'='*50}")
             
             debate_data['stage'] = DebateStage.SEARCH
             debate_data['timeline'].append({
-                'stage': 'search_start',
+                'stage': 'search_evaluation',
                 'time': get_current_time_str(),
-                'message': f"Search with {len(self.available_engines)} AI engines"
+                'message': f"Evaluating need for current data search"
             })
             
-            # Render optimized search with memory limits
-            search_results = await enhanced_google_search_render(question, max_sources)
+            # Determine if current data is needed
+            search_needed = self._is_current_data_needed(question)
+            search_results = []
             
-            # Store results for all AIs
-            for ai_provider in self.available_engines:
-                debate_data['ai_responses'][ai_provider] = {
-                    'search_sources': search_results,
-                    'search_error': None
-                }
+            if search_needed:
+                print(f"📊 Current data needed for: {question}")
+                search_results = await enhanced_google_search_render(question, max_sources)
+                # Add Wikipedia knowledge
+                wikipedia_sources = await get_wikipedia_knowledge(question, max_results=1)
+                search_results.extend(wikipedia_sources)
+            else:
+                print(f"🧠 Using Gemini's inherent knowledge for: {question}")
+                # Still get Wikipedia for context, but minimal news
+                wikipedia_sources = await get_wikipedia_knowledge(question, max_results=2)
+                search_results = wikipedia_sources
+            
+            debate_data['gemini_response']['search_sources'] = search_results
+            debate_data['gemini_response']['search_strategy'] = 'current_data' if search_needed else 'knowledge_based'
             
             debate_data['timeline'].append({
                 'stage': 'search_complete',
                 'time': get_current_time_str(),
-                'message': f"Search completed: {len(search_results)} sources"
+                'message': f"Search completed: {len(search_results)} sources ({debate_data['gemini_response']['search_strategy']})"
             })
             
-            # 🤖 STAGE 2: RENDER OPTIMIZED AI ANALYSIS
+            # 🤖 STAGE 2: GEMINI INTELLIGENT RESPONSE
             print(f"\n{'='*50}")
-            print(f"🤖 RENDER OPTIMIZED AI ANALYSIS")
+            print(f"🤖 GEMINI INTELLIGENT ANALYSIS")
             print(f"{'='*50}")
             
             debate_data['stage'] = DebateStage.INITIAL_RESPONSE
             
-            context = self._build_render_context(search_results, current_date_str)
-            print(f"📄 Render context built: {len(context)} characters")
+            context = self._build_intelligent_context(search_results, current_date_str, search_needed)
+            print(f"📄 Intelligent context built: {len(context)} characters")
             
-            initial_tasks = []
-            for ai_provider in self.available_engines:
-                initial_tasks.append(self._ai_render_response(ai_provider, question, context))
-            
-            initial_results = await asyncio.gather(*initial_tasks, return_exceptions=True)
-            
-            for i, result in enumerate(initial_results):
-                ai_provider = self.available_engines[i]
-                if isinstance(result, Exception):
-                    print(f"❌ {ai_provider.value.upper()} response failed: {result}")
-                    debate_data['ai_responses'][ai_provider]['initial_response'] = f"Error: {str(result)}"
-                else:
-                    print(f"✅ {ai_provider.value.upper()} response generated")
-                    debate_data['ai_responses'][ai_provider]['initial_response'] = result
-            
-            # 🎯 STAGE 3: RENDER OPTIMIZED CONSENSUS
-            print(f"\n{'='*50}")
-            print("🎯 RENDER OPTIMIZED CONSENSUS")
-            print(f"{'='*50}")
-            
-            debate_data['stage'] = DebateStage.CONSENSUS
-            
-            consensus_result = await self._build_render_consensus(
-                question,
-                debate_data['ai_responses'],
-                context
-            )
-            
-            debate_data['consensus_score'] = consensus_result['scores']
-            debate_data['final_answer'] = consensus_result['final_answer']
+            gemini_response = await self._gemini_intelligent_response(question, context, search_needed)
+            debate_data['gemini_response']['analysis'] = gemini_response
             
             debate_data['timeline'].append({
-                'stage': 'consensus_complete',
+                'stage': 'gemini_complete',
                 'time': get_current_time_str(),
-                'message': f"Render optimized consensus achieved"
+                'message': f"Gemini intelligent analysis completed"
             })
             
-            print(f"✅ RENDER OPTIMIZED MULTI-AI DEBATE COMPLETED")
+            # 🎯 STAGE 3: FINAL ANSWER (No consensus needed - single AI)
+            debate_data['stage'] = DebateStage.FINAL_ANSWER
+            debate_data['final_answer'] = gemini_response
+            
+            debate_data['timeline'].append({
+                'stage': 'final_answer',
+                'time': get_current_time_str(),
+                'message': f"Final intelligent response ready"
+            })
+            
+            print(f"✅ GEMINI INTELLIGENT SYSTEM COMPLETED")
             
             return debate_data
             
         except Exception as e:
-            print(f"❌ RENDER OPTIMIZED DEBATE ERROR: {e}")
+            print(f"❌ GEMINI INTELLIGENT SYSTEM ERROR: {e}")
             return {
                 'question': question,
                 'error': str(e),
@@ -687,172 +758,124 @@ class RenderOptimizedMultiAIEngine:
                 'timeline': debate_data.get('timeline', [])
             }
 
-    async def _ai_render_response(self, ai_provider: AIProvider, question: str, context: str):
-        """🚀 Render optimized AI response with memory limits"""
+    def _is_current_data_needed(self, question: str) -> bool:
+        """Determine if question needs current financial data"""
+        current_data_keywords = [
+            'hôm nay', 'hiện tại', 'bây giờ', 'mới nhất', 'cập nhật',
+            'giá', 'tỷ giá', 'chỉ số', 'index', 'price', 'rate',
+            'vn-index', 'usd', 'vnd', 'vàng', 'gold', 'bitcoin',
+            'chứng khoán', 'stock', 'market'
+        ]
+        
+        question_lower = question.lower()
+        
+        # Check for current data keywords
+        current_data_score = sum(1 for keyword in current_data_keywords if keyword in question_lower)
+        
+        # Check for specific date mentions (indicates current data need)
+        date_patterns = [
+            r'\d{1,2}/\d{1,2}/\d{4}',  # DD/MM/YYYY
+            r'ngày \d{1,2}',           # ngày X
+            r'tháng \d{1,2}'           # tháng X
+        ]
+        
+        has_date = any(re.search(pattern, question_lower) for pattern in date_patterns)
+        
+        # Return True if needs current data (score >= 2 or has specific date)
+        return current_data_score >= 2 or has_date
+
+    async def _gemini_intelligent_response(self, question: str, context: str, use_current_data: bool):
+        """🚀 Gemini intelligent response with adaptive data usage"""
         try:
             current_date_str = get_current_date_str()
-            personality = self.ai_engines[ai_provider]['personality']
             
-            # Render optimized personality prompts
-            personality_prompts = {
-                'analytical_researcher': f"Bạn là nhà phân tích. Phân tích DỮ LIỆU từ CONTEXT ngày {current_date_str}. Trích dẫn SỐ LIỆU cụ thể.",
-                'financial_expert': f"Bạn là chuyên gia tài chính. Tập trung SỐ LIỆU TÀI CHÍNH từ CONTEXT ngày {current_date_str}. Đưa ra GIÁ CẢ chính xác."
-            }
-            
-            prompt = f"""{personality_prompts.get(personality, f'Bạn là chuyên gia tài chính phân tích dữ liệu {current_date_str}.')}
-
-CONTEXT (DỮ LIỆU THỰC NGÀY {current_date_str}):
-{context}
+            if use_current_data:
+                # Use 20-40% current data for specific queries
+                prompt = f"""Bạn là Gemini AI - chuyên gia tài chính thông minh. Hãy trả lời câu hỏi dựa chủ yếu trên KIẾN THỨC CHUYÊN MÔN của bạn, chỉ sử dụng dữ liệu hiện tại khi thực sự CẦN THIẾT và CHÍNH XÁC.
 
 CÂU HỎI: {question}
 
-YÊU CẦU:
-1. SỬ DỤNG SỐ LIỆU CỤ THỂ từ Context
-2. TRÍCH DẪN NGUỒN TIN
-3. Độ dài: 150-250 từ (ngắn gọn cho Render)
+DỮ LIỆU HIỆN TẠI (chỉ dùng khi cần thiết): {context}
 
-Trả lời chuyên sâu với SỐ LIỆU THỰC:"""
+HƯỚNG DẪN TRẢ LỜI:
+1. ƯU TIÊN kiến thức chuyên môn của bạn (70-80%)
+2. CHỈ DÙNG dữ liệu hiện tại khi:
+   - Câu hỏi về giá cả, tỷ giá, chỉ số cụ thể ngày {current_date_str}
+   - Dữ liệu từ context CHÍNH XÁC và CẬP NHẬT
+3. GIẢI THÍCH ý nghĩa, nguyên nhân, tác động dựa trên kiến thức của bạn
+4. Độ dài: 300-500 từ với phân tích chuyên sâu
 
-            response = await self._call_ai_engine_render(ai_provider, prompt)
+Hãy đưa ra câu trả lời THÔNG MINH và TOÀN DIỆN:"""
+            else:
+                # Use 90-95% inherent knowledge for general queries
+                prompt = f"""Bạn là Gemini AI - chuyên gia kinh tế tài chính thông minh. Hãy trả lời câu hỏi dựa HOÀN TOÀN trên KIẾN THỨC CHUYÊN MÔN sâu rộng của bạn.
+
+CÂU HỎI: {question}
+
+KIẾN THỨC THAM KHẢO (nếu có): {context}
+
+HƯỚNG DẪN TRẢ LỜI:
+1. SỬ DỤNG kiến thức chuyên môn của bạn (90-95%)
+2. GIẢI THÍCH khái niệm, nguyên lý, cơ chế hoạt động
+3. ĐƯA RA ví dụ thực tế và phân tích chuyên sâu
+4. KẾT NỐI với bối cảnh kinh tế rộng lớn
+5. Độ dài: 400-600 từ với phân tích toàn diện
+
+Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini AI:"""
+
+            response = await self._call_gemini_render(prompt)
             return response
             
         except Exception as e:
-            print(f"❌ {ai_provider.value.upper()} render response error: {e}")
-            return f"Error: {str(e)}"
+            print(f"❌ Gemini intelligent response error: {e}")
+            return f"Lỗi phân tích thông minh: {str(e)}"
 
-    async def _build_render_consensus(self, question: str, ai_responses: dict, context: str):
-        """🚀 Render optimized consensus with memory limits"""
+    def _build_intelligent_context(self, sources: List[dict], current_date_str: str, prioritize_current: bool) -> str:
+        """🚀 Build intelligent context based on data priority"""
+        if not sources:
+            return f"Không có dữ liệu bổ sung cho ngày {current_date_str}"
         
-        current_date_str = get_current_date_str()
+        context = f"DỮ LIỆU THAM KHẢO ({current_date_str}):\n"
         
-        consensus_result = {
-            'scores': {},
-            'final_answer': '',
-            'reasoning': ''
-        }
-        
-        try:
-            participating_ais = [ai for ai in self.available_engines if ai in ai_responses and 'initial_response' in ai_responses[ai]]
+        if prioritize_current:
+            # Prioritize financial and current data
+            financial_sources = [s for s in sources if any(term in s.get('source_name', '').lower() 
+                               for term in ['sjc', 'pnj', 'vietcombank', 'cafef', 'vneconomy'])]
+            wikipedia_sources = [s for s in sources if 'wikipedia' in s.get('source_name', '').lower()]
             
-            if not participating_ais:
-                consensus_result['final_answer'] = f"Không thể đạt được sự đồng thuận do thiếu dữ liệu ngày {current_date_str}."
-                return consensus_result
+            if financial_sources:
+                context += "\n📊 DỮ LIỆU TÀI CHÍNH HIỆN TẠI:\n"
+                for i, source in enumerate(financial_sources[:2], 1):  # Limit to 2
+                    snippet = source['snippet'][:200] + "..." if len(source['snippet']) > 200 else source['snippet']
+                    context += f"Dữ liệu {i} ({source['source_name']}): {snippet}\n"
             
-            # Render optimized scoring
-            for ai_provider in participating_ais:
-                score = 0
-                response = ai_responses[ai_provider].get('initial_response', '')
-                
-                # Base score
-                score += min(len(response) / 10, 40)  # Reduced max score
-                
-                # Data relevance scoring
-                if current_date_str in response:
-                    score += 30
-                if re.search(r'\d+[.,]\d+', response):
-                    score += 25
-                if re.search(r'triệu|nghìn|tỷ|USD|VND', response):
-                    score += 20
-                
-                consensus_result['scores'][ai_provider] = score
+            if wikipedia_sources:
+                context += "\n📚 KIẾN THỨC NỀN:\n"
+                for source in wikipedia_sources[:1]:  # Only 1 for context
+                    snippet = source['snippet'][:150] + "..." if len(source['snippet']) > 150 else source['snippet']
+                    context += f"Kiến thức ({source['source_name']}): {snippet}\n"
+        else:
+            # Prioritize knowledge sources
+            wikipedia_sources = [s for s in sources if 'wikipedia' in s.get('source_name', '').lower()]
             
-            # Find best AI
-            best_ai = max(consensus_result['scores'], key=consensus_result['scores'].get)
-            
-            print(f"🏆 RENDER BEST AI: {self.ai_engines[best_ai]['name']} (Score: {consensus_result['scores'][best_ai]:.0f})")
-            
-            # Render optimized final answer synthesis
-            all_responses = ""
-            for ai_provider in participating_ais:
-                ai_name = self.ai_engines[ai_provider]['name']
-                response = ai_responses[ai_provider].get('initial_response', '')
-                all_responses += f"\n{ai_name}: {response}\n"
-            
-            final_prompt = f"""Bạn là {self.ai_engines[best_ai]['name']} - tổng hợp từ {len(participating_ais)} AI.
-
-NHIỆM VỤ: Tổng hợp DỮ LIỆU THỰC ngày {current_date_str} thành câu trả lời HOÀN CHỈNH.
-
-CÂU HỎI: {question}
-
-DỮ LIỆU: {context}
-
-PHÂN TÍCH TỪ {len(participating_ais)} AI:
-{all_responses}
-
-Tổng hợp thành câu trả lời (300-400 từ):
-1. BẮT ĐẦU: "Phân tích từ {len(participating_ais)} AI cho thấy..."
-2. SỬ DỤNG SỐ LIỆU CỤ THỂ từ Context
-3. KẾT LUẬN rõ ràng với dữ liệu {current_date_str}"""
-
-            # Use the best AI for synthesis
-            final_answer = await self._call_ai_engine_render(best_ai, final_prompt)
-            consensus_result['final_answer'] = final_answer
-            consensus_result['reasoning'] = f"Synthesized by {self.ai_engines[best_ai]['name']}"
-            
-            print(f"✅ RENDER CONSENSUS: Final answer generated")
-            
-        except Exception as e:
-            print(f"❌ RENDER CONSENSUS ERROR: {e}")
-            consensus_result['final_answer'] = f"Error: {str(e)}"
-        
-        return consensus_result
-
-    def _build_render_context(self, sources: List[dict], current_date_str: str) -> str:
-        """🚀 Render optimized context with memory limits + Wikipedia integration"""
-        context = f"DỮ LIỆU NGÀY {current_date_str}:\n"
-        
-        # Categorize sources for better context
-        financial_sources = []
-        wikipedia_sources = []
-        news_sources = []
-        
-        for source in sources:
-            source_name = source.get('source_name', '').lower()
-            if 'wikipedia' in source_name:
-                wikipedia_sources.append(source)
-            elif any(term in source_name.lower() for term in ['sjc', 'pnj', 'vietcombank', 'finance']):
-                financial_sources.append(source)
-            else:
-                news_sources.append(source)
-        
-        # Build organized context
-        source_counter = 1
-        
-        if financial_sources:
-            context += "\n📊 DỮ LIỆU TÀI CHÍNH:\n"
-            for source in financial_sources:
-                snippet = source['snippet'][:200] + "..." if len(source['snippet']) > 200 else source['snippet']
-                context += f"Nguồn {source_counter} ({source['source_name']}): {snippet}\n"
-                source_counter += 1
-        
-        if wikipedia_sources:
-            context += "\n📚 KIẾN THỨC CHUYÊN MÔN:\n"
-            for source in wikipedia_sources:
-                snippet = source['snippet'][:250] + "..." if len(source['snippet']) > 250 else source['snippet']  # Slightly longer for knowledge
-                context += f"Kiến thức {source_counter} ({source['source_name']}): {snippet}\n"
-                source_counter += 1
-        
-        if news_sources:
-            context += "\n📰 TIN TỨC & PHÂN TÍCH:\n"
-            for source in news_sources:
-                snippet = source['snippet'][:200] + "..." if len(source['snippet']) > 200 else source['snippet']
-                context += f"Tin tức {source_counter} ({source['source_name']}): {snippet}\n"
-                source_counter += 1
+            if wikipedia_sources:
+                context += "\n📚 KIẾN THỨC CHUYÊN MÔN:\n"
+                for i, source in enumerate(wikipedia_sources[:2], 1):
+                    snippet = source['snippet'][:250] + "..." if len(source['snippet']) > 250 else source['snippet']
+                    context += f"Kiến thức {i} ({source['source_name']}): {snippet}\n"
         
         return context
 
     async def _call_ai_engine_render(self, ai_provider: AIProvider, prompt: str):
-        """🚀 Render optimized AI engine calls"""
+        """🚀 Call specific AI engine (Gemini only for !hoi)"""
         try:
             if ai_provider == AIProvider.GEMINI:
                 return await self._call_gemini_render(prompt)
-            elif ai_provider == AIProvider.GROQ:
-                return await self._call_groq_render(prompt)
-            
-            raise Exception(f"Unknown AI provider: {ai_provider}")
+            else:
+                raise Exception(f"AI provider {ai_provider} not available for !hoi command")
             
         except Exception as e:
-            print(f"❌ Error calling render {ai_provider.value}: {str(e)}")
+            print(f"❌ Error calling {ai_provider.value}: {str(e)}")
             raise e
 
     async def _call_gemini_render(self, prompt: str):
@@ -1062,16 +1085,16 @@ async def on_command_error(ctx, error):
         print(f"❌ Command error: {error}")
         await ctx.send(f"❌ Lỗi: {str(error)}")
 
-# 🚀 RENDER OPTIMIZED MAIN COMMAND
+# 🚀 RENDER OPTIMIZED MAIN COMMAND - Gemini Only with Intelligent Analysis
 @bot.command(name='hoi')
-async def render_optimized_multi_ai_question(ctx, *, question):
-    """🚀 Render Optimized Multi-AI System with memory efficiency"""
+async def render_optimized_gemini_question(ctx, *, question):
+    """🚀 Gemini Intelligent System with adaptive knowledge usage"""
     
     try:
         if len(debate_engine.available_engines) < 1:
             embed = discord.Embed(
-                title="⚠️ Multi-AI System không khả dụng",
-                description=f"Cần ít nhất 1 AI engine. Hiện có: {len(debate_engine.available_engines)}",
+                title="⚠️ Gemini AI System không khả dụng",
+                description=f"Cần Gemini AI để hoạt động. Hiện có: {len(debate_engine.available_engines)} engine",
                 color=0xff6b6b
             )
             await ctx.send(embed=embed)
@@ -1079,119 +1102,128 @@ async def render_optimized_multi_ai_question(ctx, *, question):
         
         current_datetime_str = get_current_datetime_str()
         
-        # Create render optimized progress message
+        # Create intelligent progress message
         progress_embed = discord.Embed(
-            title="🚀 Multi-AI System - Render Optimized",
-            description=f"**Câu hỏi:** {question}\n\n🔄 **Đang phân tích với {len(debate_engine.available_engines)} AI miễn phí...**",
+            title="💎 Gemini Intelligent System - Render Optimized",
+            description=f"**Câu hỏi:** {question}\n\n🧠 **Đang phân tích thông minh với Gemini AI...**",
             color=0x9932cc,
             timestamp=ctx.message.created_at
         )
         
-        ai_list = ""
-        for ai_provider in debate_engine.available_engines:
-            ai_info = debate_engine.ai_engines[ai_provider]
-            ai_list += f"{ai_info['emoji']} **{ai_info['name']}** - {ai_info['strength']} ({ai_info['free_limit']}) ✅\n"
+        # Show Gemini info
+        if AIProvider.GEMINI in debate_engine.ai_engines:
+            gemini_info = debate_engine.ai_engines[AIProvider.GEMINI]
+            ai_status = f"{gemini_info['emoji']} **{gemini_info['name']}** - {gemini_info['strength']} ({gemini_info['free_limit']}) ✅"
+        else:
+            ai_status = "❌ Gemini không khả dụng"
         
         progress_embed.add_field(
-            name="🤖 FREE AI Engines (Render Optimized)",
-            value=ai_list,
+            name="🤖 Gemini Intelligent Engine",
+            value=ai_status,
             inline=False
         )
         
         progress_embed.add_field(
-            name="🚀 Render Features + Wikipedia",
-            value=f"✅ **Memory Optimized**: 400-450MB RAM efficient\n✅ **Wikipedia**: Knowledge base (VN + EN)\n✅ **FREE APIs**: Gemini + Groq miễn phí\n✅ **Fast Response**: Tối ưu tốc độ\n✅ **Auto-translate**: Dịch tự động\n✅ **Content Extract**: Trafilatura + Newspaper3k\n✅ **Cost**: $0/month",
+            name="🧠 Intelligent Features",
+            value=f"✅ **Smart Analysis**: Ưu tiên kiến thức chuyên sâu\n✅ **Adaptive Data**: Chỉ dùng tin tức khi cần thiết\n✅ **Wikipedia**: Knowledge base integration\n✅ **Context Aware**: Hiểu câu hỏi và chọn strategy phù hợp\n✅ **Memory Optimized**: 400-450MB RAM\n✅ **Cost**: $0/month",
             inline=False
         )
         
         progress_msg = await ctx.send(embed=progress_embed)
         
-        # Start render optimized debate
-        print(f"\n🚀 STARTING RENDER OPTIMIZED MULTI-AI DEBATE for: {question}")
-        debate_result = await debate_engine.render_optimized_multi_ai_debate(question, max_sources=3)
+        # Start Gemini intelligent analysis
+        print(f"\n💎 STARTING GEMINI INTELLIGENT ANALYSIS for: {question}")
+        analysis_result = await debate_engine.render_optimized_multi_ai_debate(question, max_sources=3)
         
         # Create result embed
-        if 'error' in debate_result:
+        if 'error' in analysis_result:
             error_embed = discord.Embed(
-                title="❌ Multi-AI System - Error",
-                description=f"**Câu hỏi:** {question}\n\n**Lỗi:** {debate_result['error']}",
+                title="❌ Gemini Intelligent System - Error",
+                description=f"**Câu hỏi:** {question}\n\n**Lỗi:** {analysis_result['error']}",
                 color=0xff6b6b,
                 timestamp=ctx.message.created_at
             )
             await progress_msg.edit(embed=error_embed)
             return
         
-        # Success with render optimized data
+        # Success with intelligent analysis
         result_embed = discord.Embed(
-            title=f"🚀 Multi-AI Analysis - Render Optimized ({current_datetime_str})",
+            title=f"💎 Gemini Intelligent Analysis ({current_datetime_str})",
             description=f"**Câu hỏi:** {question}",
             color=0x00ff88,
             timestamp=ctx.message.created_at
         )
         
-        # Add final answer
-        final_answer = debate_result.get('final_answer', 'Không có câu trả lời.')
-        if len(final_answer) > 800:  # Reduced from 1000 for Render
+        # Add intelligent answer
+        final_answer = analysis_result.get('final_answer', 'Không có câu trả lời.')
+        
+        # Determine analysis strategy used
+        strategy = analysis_result.get('gemini_response', {}).get('search_strategy', 'knowledge_based')
+        strategy_text = "Dữ liệu hiện tại" if strategy == 'current_data' else "Kiến thức chuyên sâu"
+        
+        if len(final_answer) > 800:
             result_embed.add_field(
-                name=f"📝 Phân tích chuyên sâu (Phần 1)",
+                name=f"🧠 Phân tích thông minh (Phần 1) - {strategy_text}",
                 value=final_answer[:800] + "...",
                 inline=False
             )
         else:
             result_embed.add_field(
-                name=f"📝 Phân tích chuyên sâu",
+                name=f"🧠 Phân tích thông minh - {strategy_text}",
                 value=final_answer,
                 inline=False
             )
         
-        # Show AI scores (if available)
-        if 'consensus_score' in debate_result and debate_result['consensus_score']:
-            scores_text = ""
-            sorted_scores = sorted(debate_result['consensus_score'].items(), key=lambda x: x[1], reverse=True)
-            
-            for i, (ai_provider, score) in enumerate(sorted_scores, 1):
-                ai_info = debate_engine.ai_engines[ai_provider]
-                medal = "🥇" if i == 1 else "🥈"
-                scores_text += f"{medal} **{ai_info['name']}** {ai_info['emoji']}: {score:.0f} điểm\n"
-            
-            result_embed.add_field(
-                name=f"🏆 Bảng xếp hạng AI",
-                value=scores_text,
-                inline=True
-            )
+        # Show analysis method
+        search_sources = analysis_result.get('gemini_response', {}).get('search_sources', [])
+        source_types = []
+        if any('wikipedia' in s.get('source_name', '').lower() for s in search_sources):
+            source_types.append("📚 Wikipedia")
+        if any(s.get('source_name', '') in ['CafeF', 'VnEconomy', 'SJC', 'PNJ'] for s in search_sources):
+            source_types.append("📊 Dữ liệu tài chính")
+        if any('reuters' in s.get('source_name', '').lower() or 'bloomberg' in s.get('source_name', '').lower() for s in search_sources):
+            source_types.append("📰 Tin tức quốc tế")
         
-        # Render optimized statistics
-        stats_text = f"🚀 **Version**: Render Optimized\n"
-        stats_text += f"🏗️ **Platform**: Render Free Tier\n"
-        stats_text += f"🤖 **AI Engines**: {len(debate_engine.available_engines)} (FREE)\n"
-        stats_text += f"💰 **Cost**: $0/month\n"
-        stats_text += f"📅 **Date**: {get_current_date_str()}"
+        analysis_method = " + ".join(source_types) if source_types else "🧠 Kiến thức riêng"
         
         result_embed.add_field(
-            name="📊 Render Statistics",
+            name=f"🔍 Phương pháp phân tích",
+            value=f"**Strategy:** {strategy_text}\n**Sources:** {analysis_method}\n**Data Usage:** {'20-40% tin tức' if strategy == 'current_data' else '5-10% tin tức'}\n**Knowledge:** {'60-80% Gemini' if strategy == 'current_data' else '90-95% Gemini'}",
+            inline=True
+        )
+        
+        # Gemini statistics
+        stats_text = f"💎 **Engine**: Gemini AI\n"
+        stats_text += f"🏗️ **Platform**: Render Free Tier\n"
+        stats_text += f"🧠 **Strategy**: {strategy_text}\n"
+        stats_text += f"📅 **Date**: {get_current_date_str()}\n"
+        stats_text += f"💰 **Cost**: $0/month"
+        
+        result_embed.add_field(
+            name="📊 Gemini Statistics",
             value=stats_text,
             inline=True
         )
         
-        result_embed.set_footer(text=f"🚀 Render Optimized Multi-AI • {current_datetime_str} • !menu")
+        result_embed.set_footer(text=f"💎 Gemini Intelligent System • Render Optimized • {current_datetime_str}")
         
         await progress_msg.edit(embed=result_embed)
         
-        # Send continuation if needed (for Render memory efficiency)
+        # Send continuation if needed
         if len(final_answer) > 800:
             continuation_embed = discord.Embed(
-                title=f"📝 Phân tích chuyên sâu (Phần 2)",
-                description=final_answer[800:1600],  # Reduced continuation size
+                title=f"🧠 Phân tích thông minh (Phần 2) - {strategy_text}",
+                description=final_answer[800:1600],
                 color=0x00ff88
             )
             
             await ctx.send(embed=continuation_embed)
         
-        print(f"✅ RENDER OPTIMIZED MULTI-AI DEBATE COMPLETED for: {question}")
+        print(f"✅ GEMINI INTELLIGENT ANALYSIS COMPLETED for: {question}")
         
     except Exception as e:
-        await ctx.send(f"❌ Lỗi hệ thống Multi-AI: {str(e)}")
-        print(f"❌ RENDER MULTI-AI ERROR: {e}")
+        await ctx.send(f"❌ Lỗi hệ thống Gemini Intelligent: {str(e)}")
+        print(f"❌ GEMINI INTELLIGENT ERROR: {e}")
 
 # 🚀 RENDER OPTIMIZED NEWS COMMANDS
 @bot.command(name='all')
@@ -1615,24 +1647,26 @@ if __name__ == "__main__":
         print("✅ Optimized AI API calls")
         print("✅ Compact RSS parsing")
         
-        print("\n✅ Multi-AI Discord News Bot - Render Optimized + Wikipedia ready!")
-        print(f"💡 Use !hoi [question] to get AI answers with REAL {get_current_date_str()} data + Wikipedia knowledge")
-        print("💡 Use !all, !in, !out for news, !chitiet [number] for details with content extraction")
+        print("\n✅ Gemini Intelligent Discord News Bot - Render + Wikipedia ready!")
+        print(f"💡 Use !hoi [question] to get Gemini intelligent answers (adaptive knowledge + data usage)")
+        print("💡 Use !all, !in, !out for news, !chitiet [number] for details with Groq translation")
         print(f"💡 Date and time automatically update: {current_datetime_str}")
         print("💡 Content extraction: Trafilatura → Newspaper3k → Legacy (memory optimized)")
-        print("💡 Knowledge base: Wikipedia (VN + EN) integrated with AI responses")
-        print("💡 FREE AI APIs working correctly with rate limiting")
+        print("💡 Translation: Groq AI for real English → Vietnamese translation")
+        print("💡 Knowledge base: Wikipedia (VN + EN) integrated with Gemini responses")
+        print("💡 Intelligent strategy: Gemini prioritizes inherent knowledge over news data")
         print("💡 Render Free Tier optimized for maximum performance at $0/month")
         
         # Final startup message
         print("\n" + "="*70)
-        print("🚀 MULTI-AI DISCORD NEWS BOT - RENDER + WIKIPEDIA EDITION")
+        print("💎 GEMINI INTELLIGENT DISCORD NEWS BOT - RENDER EDITION")
         print("💰 COST: $0/month (100% FREE AI tiers)")
         print("🏗️ PLATFORM: Render Free Tier (400-450MB RAM used)")
-        print("🤖 AI ENGINES: Gemini (15 req/min) + Groq (30 req/min)")
-        print("📚 KNOWLEDGE: Wikipedia (VN + EN) integration")
-        print("🚀 FEATURES: News + Extract + Translate + Multi-AI + Wikipedia")
-        print("🎯 USAGE: !menu for complete guide")
+        print("🤖 AI ENGINES: Gemini (Primary for !hoi) + Groq (Translation only)")
+        print("🧠 INTELLIGENCE: Adaptive knowledge usage (5-95% news data)")
+        print("📚 KNOWLEDGE: Wikipedia + Gemini inherent knowledge")
+        print("🌐 TRANSLATION: Real Groq AI translation for international news")
+        print("🎯 USAGE: !menu for intelligent guide")
         print("="*70)
         
         bot.run(TOKEN)
