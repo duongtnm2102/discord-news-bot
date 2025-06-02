@@ -639,30 +639,171 @@ async def fetch_content_stealth_legacy(url):
         print(f"⚠️ Stealth legacy error: {e} - falling back to summary")
         return await fallback_to_summary(url)
 
-async def fallback_to_summary(url):
-    """🆘 Fallback graceful khi không thể extract full content"""
+# 🚀 SMART INTERNATIONAL FALLBACK SYSTEM
+async def fetch_content_smart_international(url, source_name, news_item=None):
+    """🚀 Smart fallback system cho tin nước ngoài với RSS content focus"""
     try:
-        # Trích xuất domain để tạo summary
-        from urllib.parse import urlparse
-        domain = urlparse(url).netloc.replace('www.', '')
+        # Thử stealth extraction trước
+        print(f"🌍 Trying stealth extraction for international: {source_name}")
         
-        # Tạo summary dựa trên domain
-        if 'bloomberg' in domain:
-            summary = "Bài viết từ Bloomberg về tin tức tài chính và thị trường. Không thể trích xuất nội dung chi tiết do bảo mật website."
-        elif 'reuters' in domain:
-            summary = "Tin tức từ Reuters về kinh tế và thị trường quốc tế. Website có bảo mật cao, không thể trích xuất nội dung đầy đủ."
-        elif 'vnexpress' in domain:
-            summary = "Bài viết từ VnExpress về kinh tế Việt Nam. Không thể lấy nội dung chi tiết do cài đặt bảo mật."
-        elif 'cafef' in domain:
-            summary = "Tin tức tài chính từ CafeF. Không thể trích xuất nội dung chi tiết do hạn chế kỹ thuật."
-        else:
-            summary = f"Bài viết từ {domain}. Không thể trích xuất nội dung chi tiết do bảo mật website hoặc hạn chế kỹ thuật."
+        add_random_delay()
+        session = requests.Session()
+        stealth_headers = get_stealth_headers(url)
+        session.headers.update(stealth_headers)
         
-        return summary
+        response = session.get(url, timeout=12, allow_redirects=True)
+        
+        if response.status_code == 200:
+            # Thử extract nhanh
+            if TRAFILATURA_AVAILABLE:
+                result = trafilatura.bare_extraction(
+                    response.content,
+                    include_comments=False,
+                    include_tables=False,
+                    include_links=False,
+                    favor_precision=True
+                )
+                
+                if result and result.get('text') and len(result['text']) > 100:
+                    content = result['text']
+                    if len(content) > 1800:
+                        content = content[:1800] + "..."
+                    session.close()
+                    print(f"✅ International stealth success: {len(content)} chars")
+                    return content.strip()
+        
+        session.close()
+        print(f"⚠️ Stealth failed for {source_name}, using smart RSS fallback...")
+        
+        # Smart RSS fallback với nội dung từ RSS
+        return await create_smart_international_content(url, source_name, news_item)
         
     except Exception as e:
-        print(f"⚠️ Fallback summary error: {e}")
-        return "Không thể trích xuất nội dung từ bài viết này. Vui lòng truy cập link để đọc bài viết gốc."
+        print(f"⚠️ International extraction error: {e}")
+        return await create_smart_international_content(url, source_name, news_item)
+
+async def create_smart_international_content(url, source_name, news_item=None):
+    """🧠 Tạo nội dung thông minh từ RSS data cho tin nước ngoài"""
+    try:
+        # Sử dụng RSS description làm content chính
+        base_content = ""
+        
+        if news_item and news_item.get('description'):
+            rss_description = news_item['description']
+            # Clean HTML từ RSS description
+            clean_desc = re.sub(r'<[^>]+>', '', rss_description)
+            clean_desc = html.unescape(clean_desc).strip()
+            
+            if len(clean_desc) > 50:
+                base_content = clean_desc
+        
+        # Enhanced content dựa trên source
+        if 'bloomberg' in source_name.lower():
+            enhanced_content = f"""**Bloomberg Markets Analysis:**
+
+{base_content if base_content else 'Financial markets and economic analysis from Bloomberg.'}
+
+**Phân tích thị trường từ Bloomberg:** Đây là một trong những nguồn tin tài chính hàng đầu thế giới, chuyên cung cấp phân tích sâu về thị trường chứng khoán, kinh tế vĩ mô, và các xu hướng đầu tư toàn cầu.
+
+**Lưu ý:** Do bảo mật cao của Bloomberg, chúng tôi chỉ có thể trích xuất tóm tắt từ RSS. Để đọc bài viết đầy đủ với charts và dữ liệu chi tiết, vui lòng truy cập link bên dưới."""
+
+        elif 'reuters' in source_name.lower():
+            enhanced_content = f"""**Reuters Business News:**
+
+{base_content if base_content else 'Breaking business and economic news from Reuters.'}
+
+**Tin tức kinh doanh từ Reuters:** Hãng thông tấn quốc tế hàng đầu, cung cấp tin tức kinh tế nhanh và chính xác từ khắp nơi trên thế giới. Reuters được biết đến với độ tin cậy cao và coverage toàn cầu.
+
+**Lưu ý:** Reuters sử dụng hệ thống bảo mật nâng cao. Nội dung trên được tóm tắt từ RSS feed. Truy cập link gốc để đọc bài viết hoàn chỉnh."""
+
+        elif 'marketwatch' in source_name.lower():
+            enhanced_content = f"""**MarketWatch Financial Analysis:**
+
+{base_content if base_content else 'Market analysis and financial insights from MarketWatch.'}
+
+**Phân tích từ MarketWatch:** Chuyên trang phân tích thị trường tài chính của Dow Jones, cung cấp insights về cổ phiếu, crypto, commodities và economic indicators.
+
+**Lưu ý:** MarketWatch có hệ thống anti-bot. Nội dung trên là tóm tắt từ RSS. Để xem charts, real-time data và phân tích đầy đủ, vui lòng click link bài viết."""
+
+        elif 'yahoo' in source_name.lower():
+            enhanced_content = f"""**Yahoo Finance Update:**
+
+{base_content if base_content else 'Financial news and market updates from Yahoo Finance.'}
+
+**Cập nhật từ Yahoo Finance:** Platform tài chính phổ biến nhất, cung cấp tin tức thị trường, giá cổ phiếu, và financial tools miễn phí cho investors.
+
+**Lưu ý:** Nội dung được tóm tắt từ RSS feed. Truy cập Yahoo Finance để xem portfolio tools, market screeners và data real-time."""
+
+        elif 'forbes' in source_name.lower():
+            enhanced_content = f"""**Forbes Money Insights:**
+
+{base_content if base_content else 'Business and investment insights from Forbes.'}
+
+**Insights từ Forbes:** Tạp chí kinh doanh danh tiếng với focus vào entrepreneurship, investing, và business strategy. Nổi tiếng với các bài phân tích về billionaires và market trends.
+
+**Lưu ý:** Forbes có paywall và bảo mật. Nội dung trên là summary từ RSS. Để đọc full article và exclusive insights, truy cập link gốc."""
+
+        elif 'financial_times' in source_name.lower() or 'ft.com' in url:
+            enhanced_content = f"""**Financial Times Analysis:**
+
+{base_content if base_content else 'Premium financial analysis from Financial Times.'}
+
+**Phân tích từ Financial Times:** Tờ báo tài chính premium hàng đầu thế giới, chuyên về global markets, economic policy và corporate news với quality journalism.
+
+**Lưu ý:** FT có premium subscription model. Nội dung trên là tóm tắt từ RSS. Để đọc full analysis và expert commentary, cần subscription hoặc click link.**"""
+
+        elif 'business_insider' in source_name.lower():
+            enhanced_content = f"""**Business Insider Report:**
+
+{base_content if base_content else 'Business news and analysis from Business Insider.'}
+
+**Báo cáo từ Business Insider:** Digital media company chuyên về business, technology và finance news với style dễ tiếp cận và insights về startup ecosystem.
+
+**Lưu ý:** Nội dung được tóm tắt từ RSS feed. Truy cập Business Insider để đọc full story và related articles.**"""
+
+        elif 'economist' in source_name.lower():
+            enhanced_content = f"""**The Economist Analysis:**
+
+{base_content if base_content else 'Economic analysis from The Economist.'}
+
+**Phân tích từ The Economist:** Tạp chí kinh tế danh tiếng với deep analysis về global economy, politics và social issues. Nổi tiếng với perspective độc đáo và quality research.
+
+**Lưu ý:** The Economist có subscription model. Nội dung trên là summary từ RSS. Để đọc full analysis và data-driven insights, cần subscription.**"""
+
+        else:
+            enhanced_content = f"""**International Financial News:**
+
+{base_content if base_content else f'Financial news from {source_name}.'}
+
+**Tin tức tài chính quốc tế:** Bài viết từ nguồn tin uy tín về thị trường tài chính và kinh tế thế giới.
+
+**Lưu ý:** Do hạn chế kỹ thuật với nguồn tin quốc tế, chúng tôi chỉ hiển thị tóm tắt từ RSS. Truy cập link để đọc bài viết đầy đủ.**"""
+
+        return enhanced_content
+        
+    except Exception as e:
+        print(f"⚠️ Smart content creation error: {e}")
+        return f"Bài viết từ {source_name} về tài chính quốc tế. Do hạn chế kỹ thuật, vui lòng truy cập link để đọc nội dung đầy đủ."
+
+def is_international_source(source_name):
+    """Check if source is international"""
+    international_sources = {
+        'yahoo_finance', 'reuters_business', 'bloomberg_markets', 
+        'marketwatch_latest', 'forbes_money', 'financial_times',
+        'business_insider', 'the_economist'
+    }
+    return source_name in international_sources
+
+# 🚀 MODIFIED MAIN EXTRACTION FUNCTION
+async def fetch_content_adaptive_enhanced(url, source_name="", news_item=None):
+    """🚀 Adaptive content extraction: Stealth cho VN, Smart RSS cho quốc tế"""
+    
+    if is_international_source(source_name):
+        # Sử dụng smart international system cho tin nước ngoài
+        return await fetch_content_smart_international(url, source_name, news_item)
+    else:
+        # Sử dụng stealth extraction cho tin trong nước
+        return await fetch_content_stealth_enhanced(url)
 
 # 🚀 AUTO-TRANSLATE WITH GROQ
 async def detect_and_translate_content_enhanced(content, source_name):
@@ -1268,7 +1409,7 @@ async def on_ready():
     print(f'📰 Ready with {total_sources} RSS sources (Full restoration)')
     print('🎯 Type !menu for guide')
     
-    status_text = f"Stealth • {ai_count} FREE AIs • 17 sources • Anti-Detection • !menu"
+    status_text = f"Adaptive • {ai_count} FREE AIs • VN Stealth + QT Smart • !menu"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -1466,7 +1607,7 @@ async def get_all_news_enhanced(ctx, page=1):
         save_user_news_enhanced(ctx.author.id, page_news, f"all_page_{page}")
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Stealth • 17 nguồn • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
+        embed.set_footer(text=f"🚀 Adaptive • 17 nguồn • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -1535,7 +1676,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         save_user_news_enhanced(ctx.author.id, page_news, f"in_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Stealth • 9 nguồn VN • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
+        embed.set_footer(text=f"🚀 Adaptive • 9 nguồn VN • Trang {page}/{total_pages} • !chitiet [số] xem chi tiết")
         
         await ctx.send(embed=embed)
         
@@ -1599,7 +1740,7 @@ async def get_international_news_enhanced(ctx, page=1):
         save_user_news_enhanced(ctx.author.id, page_news, f"out_page_{page}")
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
-        embed.set_footer(text=f"🚀 Stealth • 8 nguồn QT • Trang {page}/{total_pages} • !chitiet [số] (auto-translate)")
+        embed.set_footer(text=f"🚀 Adaptive • 8 nguồn QT • Trang {page}/{total_pages} • !chitiet [số] (smart RSS)")
         
         await ctx.send(embed=embed)
         
@@ -1626,14 +1767,20 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         
         news = news_list[news_number - 1]
         
-        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung Stealth Enhanced (bypass 403/406)...")
+        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung: VN (Stealth) + QT (Smart RSS)...")
         
-        # Stealth content extraction (fixed)
-        full_content = await fetch_content_stealth_enhanced(news['link'])
+        # Adaptive content extraction: Stealth cho VN, Smart RSS cho QT
+        full_content = await fetch_content_adaptive_enhanced(news['link'], news['source'], news)
         
-        # Enhanced auto-translate
+        # Extract source name
         source_name = extract_source_name(news['link'])
-        translated_content, is_translated = await detect_and_translate_content_enhanced(full_content, source_name)
+        
+        # Auto-translate chỉ cho tin quốc tế
+        if is_international_source(news['source']):
+            translated_content, is_translated = await detect_and_translate_content_enhanced(full_content, source_name)
+        else:
+            # Tin trong nước không cần dịch
+            translated_content, is_translated = full_content, False
         
         await loading_msg.delete()
         
@@ -1671,7 +1818,7 @@ async def get_news_detail_enhanced(ctx, news_number: int):
                 inline=False
             )
             
-            optimized_embeds[-1].set_footer(text=f"🚀 Stealth Content Extraction • Tin số {news_number} • !hoi [question]")
+            optimized_embeds[-1].set_footer(text=f"🚀 Adaptive Content • Tin số {news_number} • !hoi [question]")
         
         # Send optimized embeds
         for embed in optimized_embeds:
@@ -1696,8 +1843,8 @@ async def help_command_enhanced(ctx):
     current_datetime_str = get_current_datetime_str()
     
     embed = discord.Embed(
-        title="🚀 Stealth Multi-AI Discord News Bot - Anti-Detection Edition",
-        description=f"Bot tin tức AI với Stealth Tech bypass 403/406 - {current_datetime_str}",
+        title="🚀 Adaptive Multi-AI Discord News Bot - VN Stealth + International Smart",
+        description=f"Bot tin tức AI với hệ thống adaptive: VN (Stealth) + QT (Smart RSS) - {current_datetime_str}",
         color=0xff9900
     )
     
@@ -1725,14 +1872,14 @@ async def help_command_enhanced(ctx):
     )
     
     embed.add_field(
-        name="🚀 Stealth Features - Anti-Detection",
-        value=f"✅ **Stealth Headers**: 10+ User-Agents rotation\n✅ **Session Management**: Cookies & anti-detection\n✅ **Random Delays**: Bypass rate limiting\n✅ **403/406 Bypass**: Bloomberg, Reuters accessible\n✅ **Graceful Fallback**: Summary khi không extract được\n✅ **Discord Optimized**: Tự động phân tách nội dung AI\n✅ **Auto-translate**: Groq AI cho tin quốc tế",
+        name="🚀 Adaptive Features - VN Stealth + International Smart",
+        value=f"✅ **VN Sources**: Stealth extraction (10+ User-Agents, bypass 403/406)\n✅ **International**: Smart RSS content + Enhanced summaries\n✅ **Session Management**: Cookies & anti-detection cho VN\n✅ **Smart Fallback**: RSS description thay vì lỗi cho QT\n✅ **Auto-translate**: Groq AI cho tin quốc tế\n✅ **Discord Optimized**: Tự động phân tách nội dung AI\n✅ **Best of Both**: Stealth cho VN + Content cho QT",
         inline=False
     )
     
     embed.add_field(
-        name="🎯 Stealth Examples",
-        value=f"**!hoi giá vàng hôm nay** - AI tìm giá vàng {get_current_date_str()}\n**!hoi tỷ giá usd vnd** - AI tìm tỷ giá hiện tại\n**!hoi lạm phát việt nam** - AI giải thích lạm phát\n**!all** - Xem tin từ 17 nguồn (stealth)\n**!chitiet 1** - Xem chi tiết với Stealth extraction (bypass 403)",
+        name="🎯 Adaptive Examples",
+        value=f"**!hoi giá vàng hôm nay** - AI tìm giá vàng {get_current_date_str()}\n**!hoi tỷ giá usd vnd** - AI tìm tỷ giá hiện tại\n**!hoi lạm phát việt nam** - AI giải thích lạm phát\n**!all** - Xem tin từ 17 nguồn (VN stealth + QT smart)\n**!chitiet 1** - VN: Full content, QT: Smart RSS summary",
         inline=False
     )
     
@@ -1744,46 +1891,46 @@ async def help_command_enhanced(ctx):
     embed.add_field(name="🔍 Enhanced Search", value=search_status, inline=True)
     embed.add_field(name="📰 News Sources", value=f"🇻🇳 **Trong nước**: 9 nguồn\n🌍 **Quốc tế**: 8 nguồn\n📊 **Tổng**: 17 nguồn\n🚀 **Status**: Enhanced & Fixed", inline=True)
     
-    embed.set_footer(text=f"🚀 Stealth Multi-AI • Anti-Detection • {current_datetime_str}")
+    embed.set_footer(text=f"🚀 Adaptive Multi-AI • VN Stealth + QT Smart • {current_datetime_str}")
     await ctx.send(embed=embed)
 
 # Cleanup function
-async def cleanup_stealth():
-    """Stealth cleanup"""
+async def cleanup_adaptive():
+    """Adaptive cleanup"""
     if debate_engine:
         await debate_engine.close_session()
     
     global user_news_cache
     if len(user_news_cache) > MAX_CACHE_ENTRIES:
         user_news_cache.clear()
-        print("🧹 Stealth memory cleanup completed")
+        print("🧹 Adaptive memory cleanup completed")
 
 # Main execution
 if __name__ == "__main__":
     try:
         keep_alive()
-        print("🚀 Starting Stealth Multi-AI Discord News Bot - Anti-Detection Edition...")
-        print("🏗️ Stealth Edition với anti-detection techniques để bypass 403/406")
+        print("🚀 Starting Adaptive Multi-AI Discord News Bot - VN Stealth + International Smart...")
+        print("🏗️ Adaptive Edition: VN sources (Stealth) + International sources (Smart RSS)")
         
         ai_count = len(debate_engine.available_engines)
-        print(f"🤖 Stealth Multi-AI System: {ai_count} FREE engines initialized")
+        print(f"🤖 Adaptive Multi-AI System: {ai_count} FREE engines initialized")
         
         current_datetime_str = get_current_datetime_str()
         print(f"🔧 Current Vietnam time: {current_datetime_str}")
         
         if ai_count >= 1:
             ai_names = [debate_engine.ai_engines[ai]['name'] for ai in debate_engine.available_engines]
-            print(f"🥊 Stealth debate ready with: {', '.join(ai_names)}")
+            print(f"🥊 Adaptive debate ready with: {', '.join(ai_names)}")
             print("💰 Cost: $0/month (FREE AI tiers only)")
-            print("🚀 Features: 17 News sources + Stealth extraction + Anti-detection + Auto-translate + Multi-AI + Discord optimized")
+            print("🚀 Features: VN Stealth extraction + International Smart RSS + Auto-translate + Multi-AI")
         else:
             print("⚠️ Warning: Need at least 1 FREE AI engine")
         
-        # Stealth status
+        # Adaptive status
         if GOOGLE_API_KEY and GOOGLE_CSE_ID:
-            print("🔍 Google Search API: Available with Stealth optimization")
+            print("🔍 Google Search API: Available with Adaptive optimization")
         else:
-            print("🔧 Google Search API: Using Stealth fallback")
+            print("🔧 Google Search API: Using Adaptive fallback")
         
         if WIKIPEDIA_AVAILABLE:
             print("📚 Wikipedia Knowledge Base: Available")
@@ -1791,50 +1938,36 @@ if __name__ == "__main__":
             print("⚠️ Wikipedia Knowledge Base: Not available")
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-        print(f"📊 {total_sources} RSS sources loaded with STEALTH TECHNIQUES")
+        print(f"📊 {total_sources} RSS sources loaded with ADAPTIVE SYSTEM")
         
-        # Stealth extraction capabilities
-        print("\n🚀 STEALTH CONTENT EXTRACTION (ANTI-DETECTION):")
-        extraction_tiers = []
-        if TRAFILATURA_AVAILABLE:
-            extraction_tiers.append("Tier 1: Stealth Trafilatura (10+ User-Agents)")
-        else:
-            print("❌ Trafilatura: Not available")
+        # Adaptive extraction capabilities
+        print("\n🚀 ADAPTIVE CONTENT EXTRACTION:")
+        print("✅ VN Sources (9): Stealth extraction với User-Agent rotation")
+        print("✅ International Sources (8): Smart RSS content + Enhanced summaries")
+        print("✅ CafeF, VnExpress, VnEconomy: Full content extraction")
+        print("✅ Bloomberg, Reuters, MarketWatch: Smart RSS với enhanced descriptions")
         
-        if NEWSPAPER_AVAILABLE:
-            extraction_tiers.append("Tier 2: Stealth Newspaper3k (Session Management)")
-        else:
-            print("❌ Newspaper3k: Not available")
+        print("\n🚀 ADAPTIVE OPTIMIZATIONS:")
+        print("✅ Domestic: Stealth headers, session management, 403/406 bypass")
+        print("✅ International: RSS descriptions + enhanced summaries")
+        print("✅ Best user experience: Full content cho VN, meaningful content cho QT")
+        print("✅ Memory efficient: Không waste resource cho impossible extractions")
+        print("✅ Discord optimization: Auto-split cho embed limits")
         
-        extraction_tiers.append("Tier 3: Stealth Legacy (Always works)")
-        
-        for tier in extraction_tiers:
-            print(f"✅ {tier}")
-        
-        print("\n🚀 STEALTH OPTIMIZATIONS:")
-        print("✅ User-Agent rotation: 10+ realistic browsers")
-        print("✅ Headers spoofing: Complete browser fingerprint")
-        print("✅ Random delays: 1-5 seconds anti-rate-limit")
-        print("✅ Session management: Cookies & state persistence")
-        print("✅ 403/406 bypass: Multiple retry strategies")
-        print("✅ Graceful fallback: Summary when extraction fails")
-        print("✅ Discord optimization: Auto-split for embed limits")
-        
-        print(f"\n✅ Stealth Multi-AI Discord News Bot ready!")
-        print(f"💡 Use !hoi [question] to get stealth Gemini answers")
-        print("💡 Use !all, !in, !out for stealth news from 17 sources")
-        print("💡 Use !chitiet [number] for stealth details (bypass 403/406)")
+        print(f"\n✅ Adaptive Multi-AI Discord News Bot ready!")
+        print(f"💡 Use !hoi [question] to get adaptive Gemini answers")
+        print("💡 Use !all, !in, !out for adaptive news (VN stealth + QT smart)")
+        print("💡 Use !chitiet [number] for adaptive details (VN: full, QT: smart RSS)")
         print(f"💡 Date auto-updates: {current_datetime_str}")
-        print("💡 Content extraction: Stealth techniques → Bypass all blocks")
-        print("💡 Anti-detection: Multiple User-Agents, delays, sessions")
+        print("💡 Content strategy: VN stealth extraction + International RSS content")
         
         print("\n" + "="*70)
-        print("🚀 STEALTH MULTI-AI DISCORD NEWS BOT - ANTI-DETECTION EDITION")
+        print("🚀 ADAPTIVE MULTI-AI DISCORD NEWS BOT")
         print("💰 COST: $0/month (100% FREE AI tiers)")
-        print("📰 SOURCES: 17 RSS feeds (9 VN + 8 International) - STEALTH ACCESS")
+        print("📰 SOURCES: 17 RSS feeds - ADAPTIVE STRATEGY")
+        print("🇻🇳 VN SOURCES: Stealth extraction (bypass anti-bot)")
+        print("🌍 INTERNATIONAL: Smart RSS content (better UX)")
         print("🤖 AI: Gemini (Primary) + Groq (Translation)")
-        print("🚀 STEALTH: User-Agent rotation, Session management, Anti-detection")
-        print("🛡️ BYPASS: 403 Forbidden, 406 Not Acceptable, Rate limits")
         print("🎯 USAGE: !menu for complete guide")
         print("="*70)
         
@@ -1851,6 +1984,6 @@ if __name__ == "__main__":
         
     finally:
         try:
-            asyncio.run(cleanup_stealth())
+            asyncio.run(cleanup_adaptive())
         except:
             pass
