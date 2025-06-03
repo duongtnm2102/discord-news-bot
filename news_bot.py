@@ -3122,12 +3122,8 @@ async def cleanup_enhanced():
         global user_news_cache
         if len(user_news_cache) > MAX_CACHE_ENTRIES:
             user_news_cache.clear()
-            print("✅ User cache cleared")
-        
-        # Clear user interaction stats (keep only recent data)
-        current_time = get_current_vietnam_datetime()
-        cutoff_time = current_time - datetime.timedelta(hours=24)
-        
+            print("✅ User cache cleared")    
+       
         users_to_remove = []
         for user_id, stats in user_interaction_stats.items():
             if stats['last_activity'] and stats['last_activity'] < cutoff_time:
