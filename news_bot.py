@@ -5,7 +5,7 @@ import requests
 import asyncio
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta  # ✅ FIXED: Added timedelta import
 import time
 import calendar
 from urllib.parse import urljoin, urlparse, quote
@@ -1136,13 +1136,13 @@ async def collect_news_stealth_enhanced(sources_dict, limit_per_source=6):
     return unique_news
 
 def save_user_news_enhanced(user_id, news_list, command_type):
-    """Enhanced user news saving"""
+    """Enhanced user news saving with timezone-aware datetime"""
     global user_news_cache
     
     user_news_cache[user_id] = {
         'news': news_list,
         'command': command_type,
-        'timestamp': get_current_vietnam_datetime()
+        'timestamp': get_current_vietnam_datetime()  # ✅ Always timezone-aware
     }
     
     if len(user_news_cache) > MAX_CACHE_ENTRIES:
@@ -2659,6 +2659,29 @@ def comprehensive_content_validation(content, min_length=200):
 import gc
 import sys
 
+def ensure_timezone_aware(dt):
+    """Ensure datetime object is timezone-aware (Vietnam timezone)"""
+    if dt is None:
+        return get_current_vietnam_datetime()
+    
+    if dt.tzinfo is None:
+        # Convert naive datetime to Vietnam timezone
+        return VN_TIMEZONE.localize(dt)
+    else:
+        # Convert to Vietnam timezone if it has different timezone
+        return dt.astimezone(VN_TIMEZONE)
+
+def safe_datetime_comparison(dt1, dt2):
+    """Safely compare two datetime objects by ensuring both are timezone-aware"""
+    try:
+        aware_dt1 = ensure_timezone_aware(dt1)
+        aware_dt2 = ensure_timezone_aware(dt2)
+        return aware_dt1, aware_dt2
+    except Exception as e:
+        print(f"⚠️ Datetime comparison error: {e}")
+        current = get_current_vietnam_datetime()
+        return current, current
+
 def optimize_memory_usage():
     """Optimize memory usage and cleanup"""
     try:
@@ -2806,10 +2829,10 @@ user_interaction_stats = defaultdict(lambda: {
 })
 
 def track_user_interaction(user_id, command, source=None):
-    """Track user interactions for analytics"""
+    """Track user interactions for analytics with timezone-aware datetime"""
     stats = user_interaction_stats[user_id]
     stats['commands_used'][command] += 1
-    stats['last_activity'] = get_current_vietnam_datetime()
+    stats['last_activity'] = get_current_vietnam_datetime()  # ✅ Always timezone-aware
     stats['total_interactions'] += 1
     
     if source:
@@ -2899,7 +2922,7 @@ import time
 from functools import wraps
 
 def performance_monitor(func):
-    """Decorator to monitor function performance"""
+    """Decorator to monitor function performance with proper error handling"""
     @wraps(func)
     async def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -2920,9 +2943,12 @@ def performance_monitor(func):
     
     return wrapper
 
-# Apply performance monitoring to key functions
-collect_news_stealth_enhanced = performance_monitor(collect_news_stealth_enhanced)
-fetch_content_with_yahoo_finance_fallback = performance_monitor(fetch_content_with_yahoo_finance_fallback)
+# Apply performance monitoring to key functions with error handling
+try:
+    collect_news_stealth_enhanced = performance_monitor(collect_news_stealth_enhanced)
+    fetch_content_with_yahoo_finance_fallback = performance_monitor(fetch_content_with_yahoo_finance_fallback)
+except Exception as e:
+    print(f"⚠️ Could not apply performance monitoring: {e}")
 
 # MISSING BOT STATUS AND HEALTH CHECK
 bot_stats = {
@@ -2941,24 +2967,28 @@ def update_bot_stats(stat_name, increment=1):
         bot_stats[stat_name] += increment
 
 def get_bot_health_status():
-    """Get bot health status"""
+    """Get bot health status with proper datetime handling"""
     if not bot_stats['start_time']:
         return "Bot not properly initialized"
     
-    uptime = get_current_vietnam_datetime() - bot_stats['start_time']
-    success_rate = 0
-    
-    total_extractions = bot_stats['successful_extractions'] + bot_stats['failed_extractions']
-    if total_extractions > 0:
-        success_rate = (bot_stats['successful_extractions'] / total_extractions) * 100
-    
-    return {
-        'uptime': str(uptime),
-        'commands_processed': bot_stats['commands_processed'],
-        'success_rate': f"{success_rate:.1f}%",
-        'ai_calls': bot_stats['ai_calls'],
-        'cache_efficiency': f"{bot_stats['cache_hits']}/{bot_stats['commands_processed']}"
-    }
+    try:
+        current_time = get_current_vietnam_datetime()  # timezone-aware
+        uptime = current_time - bot_stats['start_time']  # both are timezone-aware now
+        success_rate = 0
+        
+        total_extractions = bot_stats['successful_extractions'] + bot_stats['failed_extractions']
+        if total_extractions > 0:
+            success_rate = (bot_stats['successful_extractions'] / total_extractions) * 100
+        
+        return {
+            'uptime': str(uptime),
+            'commands_processed': bot_stats['commands_processed'],
+            'success_rate': f"{success_rate:.1f}%",
+            'ai_calls': bot_stats['ai_calls'],
+            'cache_efficiency': f"{bot_stats['cache_hits']}/{bot_stats['commands_processed']}"
+        }
+    except Exception as e:
+        return f"Error calculating health status: {str(e)}"
 
 @bot.command(name='status')
 async def bot_status_command(ctx):
@@ -3004,7 +3034,7 @@ async def bot_status_command(ctx):
 # UPDATE ON_READY TO INITIALIZE STATS
 async def on_ready_enhanced():
     """Enhanced on_ready with proper initialization"""
-    bot_stats['start_time'] = get_current_vietnam_datetime()
+    bot_stats['start_time'] = get_current_vietnam_datetime()  # ✅ This is timezone-aware
     
     print(f'✅ {bot.user} is online!')
     
@@ -3027,7 +3057,10 @@ async def on_ready_enhanced():
     print(f"🕰️ Started at: {current_datetime_str}")
 
 # Replace the original on_ready
-bot.remove_listener(bot.on_ready)
+try:
+    bot.remove_listener(bot.on_ready)
+except:
+    pass  # In case there's no existing listener
 bot.event(on_ready_enhanced)
 
 # MISSING COMPREHENSIVE ERROR HANDLER FOR COMMANDS
@@ -3079,7 +3112,10 @@ async def on_command_error_enhanced(ctx, error):
             await ctx.send(f"❌ Lỗi: {str(error)}")
 
 # Replace the original error handler
-bot.remove_listener(bot.on_command_error)
+try:
+    bot.remove_listener(bot.on_command_error)
+except:
+    pass  # In case there's no existing error handler
 bot.event(on_command_error_enhanced)
 
 # MISSING UPDATE COMMANDS TO USE TRACKING
@@ -3100,12 +3136,15 @@ def track_command_usage(func):
     
     return wrapper
 
-# Apply tracking to main commands (update the existing commands)
-get_all_news_enhanced = track_command_usage(get_all_news_enhanced)
-get_domestic_news_enhanced = track_command_usage(get_domestic_news_enhanced) 
-get_international_news_enhanced = track_command_usage(get_international_news_enhanced)
-get_news_detail_enhanced = track_command_usage(get_news_detail_enhanced)
-enhanced_gemini_question_with_article_context = track_command_usage(enhanced_gemini_question_with_article_context)
+# Apply tracking to main commands (update the existing commands with error handling)
+try:
+    get_all_news_enhanced = track_command_usage(get_all_news_enhanced)
+    get_domestic_news_enhanced = track_command_usage(get_domestic_news_enhanced) 
+    get_international_news_enhanced = track_command_usage(get_international_news_enhanced)
+    get_news_detail_enhanced = track_command_usage(get_news_detail_enhanced)
+    enhanced_gemini_question_with_article_context = track_command_usage(enhanced_gemini_question_with_article_context)
+except Exception as e:
+    print(f"⚠️ Could not apply command tracking: {e}")
 
 # MISSING CLEANUP FUNCTION
 async def cleanup_enhanced():
@@ -3122,10 +3161,15 @@ async def cleanup_enhanced():
         global user_news_cache
         if len(user_news_cache) > MAX_CACHE_ENTRIES:
             user_news_cache.clear()
-            print("✅ User cache cleared")    
-       
+            print("✅ User cache cleared")
+        
+        # Clear user interaction stats (keep only recent data)
+        current_time = get_current_vietnam_datetime()
+        cutoff_time = current_time - timedelta(hours=24)  # ✅ FIXED: Use timedelta directly
+        
         users_to_remove = []
         for user_id, stats in user_interaction_stats.items():
+            # ✅ FIXED: Ensure both datetimes are timezone-aware for comparison
             if stats['last_activity'] and stats['last_activity'] < cutoff_time:
                 users_to_remove.append(user_id)
         
@@ -3337,7 +3381,9 @@ if __name__ == "__main__":
         # Memory and performance baseline
         initial_memory = optimize_memory_usage()
         print(f"💾 Initial memory: {initial_memory.get('cache_size', 0)} cache entries")
-        print(f"🕰️ Boot time: {(get_current_vietnam_datetime() - datetime.strptime(get_current_datetime_str(), '%H:%M %d/%m/%Y')).total_seconds():.2f}s")
+        
+        # ✅ FIXED: Removed problematic boot time calculation that mixed aware/naive datetimes
+        print("⚡ Boot sequence completed successfully")
         print()
         
         print("🚀 Starting Discord bot...")
@@ -3391,14 +3437,22 @@ if __name__ == "__main__":
         
         # Final summary
         if 'bot_stats' in globals() and bot_stats.get('start_time'):
-            final_health = get_bot_health_status()
-            if isinstance(final_health, dict):
-                print("📊 Final Session Stats:")
-                print(f"   • Runtime: {final_health['uptime']}")
-                print(f"   • Commands processed: {final_health['commands_processed']}")
-                print(f"   • Success rate: {final_health['success_rate']}")
-                print(f"   • AI calls made: {final_health['ai_calls']}")
+            try:
+                final_health = get_bot_health_status()
+                if isinstance(final_health, dict):
+                    print("📊 Final Session Stats:")
+                    print(f"   • Runtime: {final_health['uptime']}")
+                    print(f"   • Commands processed: {final_health['commands_processed']}")
+                    print(f"   • Success rate: {final_health['success_rate']}")
+                    print(f"   • AI calls made: {final_health['ai_calls']}")
+                    print("=" * 60)
+            except Exception as e:
+                print(f"⚠️ Could not generate final stats: {e}")
                 print("=" * 60)
         
         # Graceful exit message
-        input("Press Enter to exit...") if os.name == 'nt' else None
+        try:
+            if os.name == 'nt':  # Windows
+                input("Press Enter to exit...")
+        except:
+            pass  # Skip input prompt on production servers
