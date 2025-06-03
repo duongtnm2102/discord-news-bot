@@ -3223,6 +3223,1253 @@ if __name__ == "__main__":
     
     return content.strip()
 
+def clean_content_for_discord(content):
+    """Clean content for Discord display"""
+    if not content:
+        return "Không có nội dung."
+    
+    # Remove excessive whitespace
+    content = re.sub(r'\s+', ' ', content)
+    
+    # Remove common unwanted patterns
+    unwanted_patterns = [
+        r'Đăng ký.*?nhận tin',
+        r'Theo dõi.*?Facebook',
+        r'Like.*?Fanpage',
+        r'Chia sẻ.*?bài viết',
+        r'Tags:.*?
+
+# ENHANCED !HOI COMMAND
+@bot.command(name='hoi')
+async def enhanced_gemini_question_with_article_context(ctx, *, question):
+    """Enhanced Gemini System với article context"""
+    
+    try:
+        if len(debate_engine.available_engines) < 1:
+            embed = create_safe_embed(
+                "⚠️ AI System không khả dụng",
+                f"Cần Gemini AI để hoạt động. Hiện có: {len(debate_engine.available_engines)} engine",
+                0xff6b6b
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        current_datetime_str = get_current_datetime_str()
+        
+        # Parse command to check for article context
+        article_context, parsed_question = parse_hoi_command(question)
+        
+        if article_context:
+            # ARTICLE-SPECIFIC ANALYSIS MODE
+            progress_embed = create_safe_embed(
+                "📰 Gemini Article Analysis",
+                f"**Phân tích bài báo:** Tin số {article_context['news_number']} ({article_context['type']} trang {article_context['page']})\n**Câu hỏi:** {parsed_question}",
+                0x9932cc
+            )
+            
+            safe_name, safe_value = validate_embed_field(
+                "🔄 Đang xử lý",
+                "📰 Đang lấy bài báo từ cache...\n🔍 Extract nội dung...\n💎 Gemini sẽ phân tích dựa trên nội dung thực tế"
+            )
+            progress_embed.add_field(name=safe_name, value=safe_value, inline=False)
+            
+            progress_msg = await ctx.send(embed=progress_embed)
+            
+            # Get article from user cache
+            article, error_msg = await get_article_from_cache(ctx.author.id, article_context)
+            
+            if error_msg:
+                error_embed = create_safe_embed(
+                    "❌ Không thể lấy bài báo",
+                    error_msg,
+                    0xff6b6b
+                )
+                await progress_msg.edit(embed=error_embed)
+                return
+            
+            # Analyze article with Gemini
+            analysis_result = await analyze_article_with_gemini_optimized(article, parsed_question, ctx.author.id)
+            
+            # Create result embed using optimized embeds
+            title = f"📰 Gemini Article Analysis ({current_datetime_str})"
+            description = f"**Bài báo:** {article['title']}\n**Nguồn:** {extract_source_name(article['link'])} • {article['published_str']}"
+            
+            # Create optimized embeds for Discord limits
+            optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
+            
+            # Add metadata to first embed
+            if optimized_embeds:
+                safe_name, safe_value = validate_embed_field(
+                    "📊 Analysis Info",
+                    f"**Mode**: Article Context Analysis\n**Article**: Tin số {article_context['news_number']} ({article_context['type']} trang {article_context['page']})\n**Analysis**: Evidence-based"
+                )
+                optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
+                
+                safe_name2, safe_value2 = validate_embed_field(
+                    "🔗 Bài báo gốc",
+                    f"[{article['title'][:50]}...]({article['link']})"
+                )
+                optimized_embeds[0].add_field(name=safe_name2, value=safe_value2, inline=True)
+                
+                optimized_embeds[-1].set_footer(text=f"📰 Gemini Article Analysis • {current_datetime_str}")
+            
+            # Send optimized embeds
+            await progress_msg.edit(embed=optimized_embeds[0])
+            
+            for embed in optimized_embeds[1:]:
+                await ctx.send(embed=embed)
+            
+        else:
+            # REGULAR GEMINI ANALYSIS MODE
+            progress_embed = create_safe_embed(
+                "💎 Gemini Intelligent System",
+                f"**Câu hỏi:** {question}\n🧠 **Đang phân tích với Gemini AI...**",
+                0x9932cc
+            )
+            
+            if AIProvider.GEMINI in debate_engine.ai_engines:
+                gemini_info = debate_engine.ai_engines[AIProvider.GEMINI]
+                ai_status = f"{gemini_info['emoji']} **{gemini_info['name']}** - {gemini_info['strength']} ({gemini_info['free_limit']}) ✅"
+            else:
+                ai_status = "❌ Gemini không khả dụng"
+            
+            safe_name, safe_value = validate_embed_field("🤖 Gemini Engine", ai_status)
+            progress_embed.add_field(name=safe_name, value=safe_value, inline=False)
+            
+            progress_msg = await ctx.send(embed=progress_embed)
+            
+            # Start regular analysis
+            analysis_result = await debate_engine.enhanced_multi_ai_debate(question, max_sources=4)
+            
+            # Handle results
+            if 'error' in analysis_result:
+                error_embed = create_safe_embed(
+                    "❌ Gemini System - Error",
+                    f"**Câu hỏi:** {question}\n**Lỗi:** {analysis_result['error']}",
+                    0xff6b6b
+                )
+                await progress_msg.edit(embed=error_embed)
+                return
+            
+            # Success - Create optimized embeds
+            final_answer = analysis_result.get('final_answer', 'Không có câu trả lời.')
+            strategy = analysis_result.get('gemini_response', {}).get('search_strategy', 'knowledge_based')
+            strategy_text = "Dữ liệu hiện tại" if strategy == 'current_data' else "Kiến thức chuyên sâu"
+            
+            # Create optimized embeds for Discord limits
+            title = f"💎 Gemini Analysis - {strategy_text}"
+            optimized_embeds = create_optimized_embeds(title, final_answer, 0x00ff88)
+            
+            # Add metadata to first embed
+            if optimized_embeds:
+                safe_name, safe_value = validate_embed_field(
+                    "🔍 Phương pháp phân tích",
+                    f"**Strategy:** {strategy_text}\n**Data Usage:** {'20-40% tin tức' if strategy == 'current_data' else '5-10% tin tức'}\n**Knowledge:** {'60-80% Gemini' if strategy == 'current_data' else '90-95% Gemini'}"
+                )
+                optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
+                
+                optimized_embeds[-1].set_footer(text=f"💎 Gemini System • {current_datetime_str}")
+            
+            # Send optimized embeds
+            await progress_msg.edit(embed=optimized_embeds[0])
+            
+            for embed in optimized_embeds[1:]:
+                await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi hệ thống Gemini: {str(e)}")
+
+# ENHANCED NEWS COMMANDS
+@bot.command(name='all')
+async def get_all_news_enhanced(ctx, page=1):
+    """Enhanced news từ tất cả nguồn"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức...")
+        
+        domestic_news = await collect_news_stealth_enhanced(RSS_FEEDS['domestic'], 6)
+        international_news = await collect_news_stealth_enhanced(RSS_FEEDS['international'], 20)  # More from Yahoo Finance
+        
+        await loading_msg.delete()
+        
+        all_news = domestic_news + international_news
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = all_news[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(all_news) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
+        international_count = len(page_news) - domestic_count
+        
+        # Enhanced emoji mapping
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 'cafef_vimo': '📊',
+            'cafebiz_main': '💼', 'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈', 'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️', 'fili_kinh_te': '📰',
+            'yahoo_finance_main': '💰'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC', 'fili_kinh_te': 'Fili.vn',
+            'yahoo_finance_main': 'Yahoo Finance'
+        }
+        
+        # Add statistics field
+        stats_field = f"🇻🇳 Trong nước: {domestic_count} tin\n🌍 Quốc tế: {international_count} tin\n📊 Tổng có sẵn: {len(all_news)} tin"
+        
+        fields_data.append(("📊 Thống kê", stats_field))
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"📰 Tin tức tổng hợp (Trang {page})",
+            "",
+            fields_data,
+            0x00ff88
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"all_page_{page}")
+        
+        total_pages = (len(all_news) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+@bot.command(name='in')
+async def get_domestic_news_enhanced(ctx, page=1):
+    """Tin tức trong nước"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức trong nước...")
+        
+        news_list = await collect_news_stealth_enhanced(RSS_FEEDS['domestic'], 8)
+        await loading_msg.delete()
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = news_list[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        stats_field = f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🎯 Lĩnh vực: Kinh tế, CK, BĐS, Vĩ mô"
+        
+        fields_data.append(("📊 Thông tin", stats_field))
+        
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢',
+            'cafef_taichinh': '💰', 'cafef_vimo': '📊', 'cafebiz_main': '💼',
+            'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈',
+            'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️', 'fili_kinh_te': '📰'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC', 'fili_kinh_te': 'Fili.vn'
+        }
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"🇻🇳 Tin kinh tế trong nước (Trang {page})",
+            "",
+            fields_data,
+            0xff0000
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"in_page_{page}")
+        
+        total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+@bot.command(name='out')
+async def get_international_news_enhanced(ctx, page=1):
+    """Tin tức quốc tế từ Yahoo Finance"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức quốc tế...")
+        
+        news_list = await collect_news_stealth_enhanced(RSS_FEEDS['international'], 20)  # More articles from Yahoo Finance
+        await loading_msg.delete()
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = news_list[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        stats_field = f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🌐 Auto-translate: Tiếng Anh → Tiếng Việt"
+        
+        fields_data.append(("📊 Thông tin", stats_field))
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = '💰'
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = 'Yahoo Finance'
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"🌍 Tin kinh tế quốc tế (Trang {page})",
+            "",
+            fields_data,
+            0x0066ff
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"out_page_{page}")
+        
+        total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+# ENHANCED ARTICLE DETAILS COMMAND
+@bot.command(name='chitiet')
+async def get_news_detail_enhanced(ctx, news_number: int):
+    """Enhanced chi tiết bài viết"""
+    try:
+        user_id = ctx.author.id
+        
+        if user_id not in user_news_cache:
+            await ctx.send("❌ Bạn chưa xem tin tức! Dùng `!all`, `!in`, hoặc `!out` trước.")
+            return
+        
+        user_data = user_news_cache[user_id]
+        news_list = user_data['news']
+        
+        if news_number < 1 or news_number > len(news_list):
+            await ctx.send(f"❌ Số không hợp lệ! Chọn từ 1 đến {len(news_list)}")
+            return
+        
+        news = news_list[news_number - 1]
+        
+        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung...")
+        
+        # Extract content
+        full_content = await fetch_full_content_for_ai_analysis(news['link'], news['source'], news)
+        
+        # Extract source name
+        source_name = extract_source_name(news['link'])
+        
+        # Auto-translate chỉ cho tin quốc tế (Yahoo Finance)
+        if 'yahoo_finance' in news['source']:
+            translated_content, is_translated = await detect_and_translate_content_enhanced(full_content, source_name)
+        else:
+            translated_content, is_translated = full_content, False
+        
+        await loading_msg.delete()
+        
+        # Create content with metadata
+        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
+        main_title = f"📖 Chi tiết bài viết{title_suffix}"
+        
+        # Enhanced metadata
+        content_with_meta = f"**📰 Tiêu đề:** {news['title']}\n"
+        content_with_meta += f"**🕰️ Thời gian:** {news['published_str']} ({get_current_date_str()})\n"
+        content_with_meta += f"**📰 Nguồn:** {source_name}{'🌐' if is_translated else ''}\n"
+        
+        if is_translated:
+            content_with_meta += f"**🔄 Auto-Translate:** Groq AI đã dịch từ tiếng Anh\n\n"
+        
+        content_with_meta += f"**📄 Nội dung chi tiết:**\n{translated_content}"
+        
+        # Tự động split thành nhiều embeds khi content dài
+        optimized_embeds = create_comprehensive_embeds(main_title, content_with_meta, 0x9932cc)
+        
+        # Add link to last embed
+        if optimized_embeds:
+            safe_name, safe_value = validate_embed_field(
+                "🔗 Đọc bài viết gốc",
+                f"[Nhấn để đọc bài viết gốc]({news['link']})"
+            )
+            optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
+            
+            total_chars = sum(len(embed.description or "") + sum(len(field.value) for field in embed.fields) for embed in optimized_embeds)
+            optimized_embeds[-1].set_footer(text=f"📖 Content • {total_chars:,} ký tự • Tin số {news_number} • {len(optimized_embeds)} phần")
+        
+        # Send all embeds with progress tracking
+        for i, embed in enumerate(optimized_embeds, 1):
+            if i == 1:
+                await ctx.send(embed=embed)
+            else:
+                await asyncio.sleep(0.5)
+                await ctx.send(embed=embed)
+        
+    except ValueError:
+        await ctx.send("❌ Vui lòng nhập số! Ví dụ: `!chitiet 5`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+def create_comprehensive_embeds(title: str, content: str, color: int = 0x9932cc) -> List[discord.Embed]:
+    """Tạo embeds cho nội dung - tự động split không giới hạn độ dài"""
+    embeds = []
+    
+    content_parts = split_text_comprehensive(content, 800)
+    
+    for i, part in enumerate(content_parts):
+        if i == 0:
+            embed = discord.Embed(
+                title=validate_and_truncate_content(title, DISCORD_EMBED_TITLE_LIMIT),
+                color=color,
+                timestamp=get_current_vietnam_datetime()
+            )
+        else:
+            embed = discord.Embed(
+                title=validate_and_truncate_content(f"{title[:150]}... (Phần {i+1}/{len(content_parts)})", DISCORD_EMBED_TITLE_LIMIT),
+                color=color,
+                timestamp=get_current_vietnam_datetime()
+            )
+        
+        if i == 0:
+            field_name = f"📄 Nội dung {f'(Phần {i+1}/{len(content_parts)})' if len(content_parts) > 1 else ''}"
+            safe_field_name, safe_field_value = validate_embed_field(field_name, part)
+            embed.add_field(name=safe_field_name, value=safe_field_value, inline=False)
+        else:
+            safe_description = validate_and_truncate_content(part, DISCORD_EMBED_DESCRIPTION_LIMIT)
+            embed.description = safe_description
+        
+        embeds.append(embed)
+    
+    return embeds
+
+def split_text_comprehensive(text: str, max_length: int = 800) -> List[str]:
+    """Split text cho comprehensive content"""
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    
+    # Try to split by paragraphs first
+    paragraphs = text.split('\n\n')
+    
+    for paragraph in paragraphs:
+        if len(paragraph) > max_length:
+            sentences = paragraph.split('. ')
+            
+            for sentence in sentences:
+                if len(current_part + sentence + '. ') <= max_length:
+                    current_part += sentence + '. '
+                else:
+                    if current_part:
+                        parts.append(current_part.strip())
+                        current_part = sentence + '. '
+                    else:
+                        words = sentence.split(' ')
+                        for word in words:
+                            if len(current_part + word + ' ') <= max_length:
+                                current_part += word + ' '
+                            else:
+                                if current_part:
+                                    parts.append(current_part.strip())
+                                    current_part = word + ' '
+                                else:
+                                    parts.append(word[:max_length])
+                                    current_part = word[max_length:] + ' '
+        else:
+            if len(current_part + paragraph + '\n\n') <= max_length:
+                current_part += paragraph + '\n\n'
+            else:
+                if current_part:
+                    parts.append(current_part.strip())
+                    current_part = paragraph + '\n\n'
+                else:
+                    parts.append(paragraph)
+    
+    if current_part:
+        parts.append(current_part.strip())
+    
+    return parts
+
+@bot.command(name='menu')
+async def help_command_simplified(ctx):
+    """Simplified menu guide"""
+    current_datetime_str = get_current_datetime_str()
+    
+    main_embed = create_safe_embed(
+        "🤖 News Bot",
+        f"Bot tin tức AI với Yahoo Finance - {current_datetime_str}",
+        0xff9900
+    )
+    
+    ai_count = len(debate_engine.available_engines)
+    if ai_count >= 1:
+        ai_status = f"🤖 **{ai_count} AI Engine sẵn sàng**"
+    else:
+        ai_status = "⚠️ Cần AI engine để hoạt động"
+    
+    safe_name, safe_value = validate_embed_field("🤖 AI Status", ai_status)
+    main_embed.add_field(name=safe_name, value=safe_value, inline=False)
+    
+    safe_name2, safe_value2 = validate_embed_field(
+        "🤖 AI Commands",
+        f"**!hoi [câu hỏi]** - AI trả lời với dữ liệu {get_current_date_str()}\n**!hoi chitiet [số] [type] [question]** - Phân tích bài báo\n*VD: !hoi chitiet 5 out tại sao?*"
+    )
+    main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
+    
+    safe_name3, safe_value3 = validate_embed_field(
+        "📰 News Commands",
+        f"**!all [trang]** - Tin từ tất cả nguồn (12 tin/trang)\n**!in [trang]** - Tin trong nước\n**!out [trang]** - Tin quốc tế (Yahoo Finance)\n**!chitiet [số]** - Chi tiết bài viết"
+    )
+    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
+    
+    safe_name4, safe_value4 = validate_embed_field(
+        "🎯 Examples",
+        f"**!hoi giá vàng hôm nay** - AI tìm giá vàng {get_current_date_str()}\n**!all** - Xem tin mới nhất\n**!chitiet 1** - Chi tiết tin số 1"
+    )
+    main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
+    
+    total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+    safe_name5, safe_value5 = validate_embed_field(
+        "📊 Sources", 
+        f"🇻🇳 **Trong nước**: {len(RSS_FEEDS['domestic'])} nguồn\n🌍 **Quốc tế**: Yahoo Finance\n📊 **Tổng**: {total_sources} nguồn"
+    )
+    main_embed.add_field(name=safe_name5, value=safe_value5, inline=True)
+    
+    main_embed.set_footer(text=f"🤖 News Bot • {current_datetime_str}")
+    await ctx.send(embed=main_embed)
+
+# Cleanup function
+async def cleanup_enhanced():
+    """Enhanced cleanup"""
+    if debate_engine:
+        await debate_engine.close_session()
+    
+    global user_news_cache
+    if len(user_news_cache) > MAX_CACHE_ENTRIES:
+        user_news_cache.clear()
+
+# Main execution
+if __name__ == "__main__":
+    try:
+        keep_alive()
+        print("🚀 Starting News Bot...")
+        
+        ai_count = len(debate_engine.available_engines)
+        current_datetime_str = get_current_datetime_str()
+        
+        if ai_count >= 1:
+            ai_names = [debate_engine.ai_engines[ai]['name'] for ai in debate_engine.available_engines]
+            print(f"🤖 AI ready: {', '.join(ai_names)}")
+        else:
+            print("⚠️ Warning: Need at least 1 AI engine")
+        
+        total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+        print(f"📊 {total_sources} sources loaded (VN: {len(RSS_FEEDS['domestic'])}, International: {len(RSS_FEEDS['international'])})")
+        
+        print(f"✅ News Bot ready!")
+        print(f"💡 Use !menu for guide")
+        
+        bot.run(TOKEN)
+        
+    except discord.LoginFailure:
+        print("❌ Discord login error!")
+        print("🔧 Check DISCORD_TOKEN in Environment Variables")
+        
+    except Exception as e:
+        print(f"❌ Bot startup error: {e}")
+        
+    finally:
+        try:
+            asyncio.run(cleanup_enhanced())
+        except:
+            pass,
+        r'Từ khóa:.*?
+
+# ENHANCED !HOI COMMAND
+@bot.command(name='hoi')
+async def enhanced_gemini_question_with_article_context(ctx, *, question):
+    """Enhanced Gemini System với article context"""
+    
+    try:
+        if len(debate_engine.available_engines) < 1:
+            embed = create_safe_embed(
+                "⚠️ AI System không khả dụng",
+                f"Cần Gemini AI để hoạt động. Hiện có: {len(debate_engine.available_engines)} engine",
+                0xff6b6b
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        current_datetime_str = get_current_datetime_str()
+        
+        # Parse command to check for article context
+        article_context, parsed_question = parse_hoi_command(question)
+        
+        if article_context:
+            # ARTICLE-SPECIFIC ANALYSIS MODE
+            progress_embed = create_safe_embed(
+                "📰 Gemini Article Analysis",
+                f"**Phân tích bài báo:** Tin số {article_context['news_number']} ({article_context['type']} trang {article_context['page']})\n**Câu hỏi:** {parsed_question}",
+                0x9932cc
+            )
+            
+            safe_name, safe_value = validate_embed_field(
+                "🔄 Đang xử lý",
+                "📰 Đang lấy bài báo từ cache...\n🔍 Extract nội dung...\n💎 Gemini sẽ phân tích dựa trên nội dung thực tế"
+            )
+            progress_embed.add_field(name=safe_name, value=safe_value, inline=False)
+            
+            progress_msg = await ctx.send(embed=progress_embed)
+            
+            # Get article from user cache
+            article, error_msg = await get_article_from_cache(ctx.author.id, article_context)
+            
+            if error_msg:
+                error_embed = create_safe_embed(
+                    "❌ Không thể lấy bài báo",
+                    error_msg,
+                    0xff6b6b
+                )
+                await progress_msg.edit(embed=error_embed)
+                return
+            
+            # Analyze article with Gemini
+            analysis_result = await analyze_article_with_gemini_optimized(article, parsed_question, ctx.author.id)
+            
+            # Create result embed using optimized embeds
+            title = f"📰 Gemini Article Analysis ({current_datetime_str})"
+            description = f"**Bài báo:** {article['title']}\n**Nguồn:** {extract_source_name(article['link'])} • {article['published_str']}"
+            
+            # Create optimized embeds for Discord limits
+            optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
+            
+            # Add metadata to first embed
+            if optimized_embeds:
+                safe_name, safe_value = validate_embed_field(
+                    "📊 Analysis Info",
+                    f"**Mode**: Article Context Analysis\n**Article**: Tin số {article_context['news_number']} ({article_context['type']} trang {article_context['page']})\n**Analysis**: Evidence-based"
+                )
+                optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
+                
+                safe_name2, safe_value2 = validate_embed_field(
+                    "🔗 Bài báo gốc",
+                    f"[{article['title'][:50]}...]({article['link']})"
+                )
+                optimized_embeds[0].add_field(name=safe_name2, value=safe_value2, inline=True)
+                
+                optimized_embeds[-1].set_footer(text=f"📰 Gemini Article Analysis • {current_datetime_str}")
+            
+            # Send optimized embeds
+            await progress_msg.edit(embed=optimized_embeds[0])
+            
+            for embed in optimized_embeds[1:]:
+                await ctx.send(embed=embed)
+            
+        else:
+            # REGULAR GEMINI ANALYSIS MODE
+            progress_embed = create_safe_embed(
+                "💎 Gemini Intelligent System",
+                f"**Câu hỏi:** {question}\n🧠 **Đang phân tích với Gemini AI...**",
+                0x9932cc
+            )
+            
+            if AIProvider.GEMINI in debate_engine.ai_engines:
+                gemini_info = debate_engine.ai_engines[AIProvider.GEMINI]
+                ai_status = f"{gemini_info['emoji']} **{gemini_info['name']}** - {gemini_info['strength']} ({gemini_info['free_limit']}) ✅"
+            else:
+                ai_status = "❌ Gemini không khả dụng"
+            
+            safe_name, safe_value = validate_embed_field("🤖 Gemini Engine", ai_status)
+            progress_embed.add_field(name=safe_name, value=safe_value, inline=False)
+            
+            progress_msg = await ctx.send(embed=progress_embed)
+            
+            # Start regular analysis
+            analysis_result = await debate_engine.enhanced_multi_ai_debate(question, max_sources=4)
+            
+            # Handle results
+            if 'error' in analysis_result:
+                error_embed = create_safe_embed(
+                    "❌ Gemini System - Error",
+                    f"**Câu hỏi:** {question}\n**Lỗi:** {analysis_result['error']}",
+                    0xff6b6b
+                )
+                await progress_msg.edit(embed=error_embed)
+                return
+            
+            # Success - Create optimized embeds
+            final_answer = analysis_result.get('final_answer', 'Không có câu trả lời.')
+            strategy = analysis_result.get('gemini_response', {}).get('search_strategy', 'knowledge_based')
+            strategy_text = "Dữ liệu hiện tại" if strategy == 'current_data' else "Kiến thức chuyên sâu"
+            
+            # Create optimized embeds for Discord limits
+            title = f"💎 Gemini Analysis - {strategy_text}"
+            optimized_embeds = create_optimized_embeds(title, final_answer, 0x00ff88)
+            
+            # Add metadata to first embed
+            if optimized_embeds:
+                safe_name, safe_value = validate_embed_field(
+                    "🔍 Phương pháp phân tích",
+                    f"**Strategy:** {strategy_text}\n**Data Usage:** {'20-40% tin tức' if strategy == 'current_data' else '5-10% tin tức'}\n**Knowledge:** {'60-80% Gemini' if strategy == 'current_data' else '90-95% Gemini'}"
+                )
+                optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
+                
+                optimized_embeds[-1].set_footer(text=f"💎 Gemini System • {current_datetime_str}")
+            
+            # Send optimized embeds
+            await progress_msg.edit(embed=optimized_embeds[0])
+            
+            for embed in optimized_embeds[1:]:
+                await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi hệ thống Gemini: {str(e)}")
+
+# ENHANCED NEWS COMMANDS
+@bot.command(name='all')
+async def get_all_news_enhanced(ctx, page=1):
+    """Enhanced news từ tất cả nguồn"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức...")
+        
+        domestic_news = await collect_news_stealth_enhanced(RSS_FEEDS['domestic'], 6)
+        international_news = await collect_news_stealth_enhanced(RSS_FEEDS['international'], 20)  # More from Yahoo Finance
+        
+        await loading_msg.delete()
+        
+        all_news = domestic_news + international_news
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = all_news[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(all_news) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
+        international_count = len(page_news) - domestic_count
+        
+        # Enhanced emoji mapping
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 'cafef_vimo': '📊',
+            'cafebiz_main': '💼', 'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈', 'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️', 'fili_kinh_te': '📰',
+            'yahoo_finance_main': '💰'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC', 'fili_kinh_te': 'Fili.vn',
+            'yahoo_finance_main': 'Yahoo Finance'
+        }
+        
+        # Add statistics field
+        stats_field = f"🇻🇳 Trong nước: {domestic_count} tin\n🌍 Quốc tế: {international_count} tin\n📊 Tổng có sẵn: {len(all_news)} tin"
+        
+        fields_data.append(("📊 Thống kê", stats_field))
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"📰 Tin tức tổng hợp (Trang {page})",
+            "",
+            fields_data,
+            0x00ff88
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"all_page_{page}")
+        
+        total_pages = (len(all_news) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+@bot.command(name='in')
+async def get_domestic_news_enhanced(ctx, page=1):
+    """Tin tức trong nước"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức trong nước...")
+        
+        news_list = await collect_news_stealth_enhanced(RSS_FEEDS['domestic'], 8)
+        await loading_msg.delete()
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = news_list[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        stats_field = f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🎯 Lĩnh vực: Kinh tế, CK, BĐS, Vĩ mô"
+        
+        fields_data.append(("📊 Thông tin", stats_field))
+        
+        emoji_map = {
+            'cafef_main': '☕', 'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢',
+            'cafef_taichinh': '💰', 'cafef_vimo': '📊', 'cafebiz_main': '💼',
+            'baodautu_main': '🎯', 'vneconomy_main': '📰', 'vneconomy_chungkhoan': '📈',
+            'vnexpress_kinhdoanh': '⚡', 'vnexpress_chungkhoan': '📈',
+            'thanhnien_kinhtevimo': '📊', 'thanhnien_chungkhoan': '📈',
+            'nhandanonline_tc': '🏛️', 'fili_kinh_te': '📰'
+        }
+        
+        source_names = {
+            'cafef_main': 'CafeF', 'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafebiz_main': 'CafeBiz',
+            'baodautu_main': 'Báo Đầu tư', 'vneconomy_main': 'VnEconomy', 'vneconomy_chungkhoan': 'VnEconomy CK',
+            'vnexpress_kinhdoanh': 'VnExpress KD', 'vnexpress_chungkhoan': 'VnExpress CK',
+            'thanhnien_kinhtevimo': 'Thanh Niên VM', 'thanhnien_chungkhoan': 'Thanh Niên CK',
+            'nhandanonline_tc': 'Nhân Dân TC', 'fili_kinh_te': 'Fili.vn'
+        }
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = emoji_map.get(news['source'], '📰')
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = source_names.get(news['source'], news['source'])
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"🇻🇳 Tin kinh tế trong nước (Trang {page})",
+            "",
+            fields_data,
+            0xff0000
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"in_page_{page}")
+        
+        total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+@bot.command(name='out')
+async def get_international_news_enhanced(ctx, page=1):
+    """Tin tức quốc tế từ Yahoo Finance"""
+    try:
+        page = max(1, int(page))
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức quốc tế...")
+        
+        news_list = await collect_news_stealth_enhanced(RSS_FEEDS['international'], 20)  # More articles from Yahoo Finance
+        await loading_msg.delete()
+        
+        items_per_page = 12
+        start_index = (page - 1) * items_per_page
+        end_index = start_index + items_per_page
+        page_news = news_list[start_index:end_index]
+        
+        if not page_news:
+            total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            return
+        
+        # Prepare fields data
+        fields_data = []
+        
+        stats_field = f"📰 Tổng tin có sẵn: {len(news_list)} tin\n🌐 Auto-translate: Tiếng Anh → Tiếng Việt"
+        
+        fields_data.append(("📊 Thông tin", stats_field))
+        
+        for i, news in enumerate(page_news, 1):
+            emoji = '💰'
+            title = news['title'][:55] + "..." if len(news['title']) > 55 else news['title']
+            source_display = 'Yahoo Finance'
+            
+            field_name = f"{i}. {emoji} {title}"
+            field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
+            
+            fields_data.append((field_name, field_value))
+        
+        # Create embeds with safe field handling
+        embeds = create_safe_embed_with_fields(
+            f"🌍 Tin kinh tế quốc tế (Trang {page})",
+            "",
+            fields_data,
+            0x0066ff
+        )
+        
+        save_user_news_enhanced(ctx.author.id, page_news, f"out_page_{page}")
+        
+        total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"News Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+        
+        # Send all embeds
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+# ENHANCED ARTICLE DETAILS COMMAND
+@bot.command(name='chitiet')
+async def get_news_detail_enhanced(ctx, news_number: int):
+    """Enhanced chi tiết bài viết"""
+    try:
+        user_id = ctx.author.id
+        
+        if user_id not in user_news_cache:
+            await ctx.send("❌ Bạn chưa xem tin tức! Dùng `!all`, `!in`, hoặc `!out` trước.")
+            return
+        
+        user_data = user_news_cache[user_id]
+        news_list = user_data['news']
+        
+        if news_number < 1 or news_number > len(news_list):
+            await ctx.send(f"❌ Số không hợp lệ! Chọn từ 1 đến {len(news_list)}")
+            return
+        
+        news = news_list[news_number - 1]
+        
+        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung...")
+        
+        # Extract content
+        full_content = await fetch_full_content_for_ai_analysis(news['link'], news['source'], news)
+        
+        # Extract source name
+        source_name = extract_source_name(news['link'])
+        
+        # Auto-translate chỉ cho tin quốc tế (Yahoo Finance)
+        if 'yahoo_finance' in news['source']:
+            translated_content, is_translated = await detect_and_translate_content_enhanced(full_content, source_name)
+        else:
+            translated_content, is_translated = full_content, False
+        
+        await loading_msg.delete()
+        
+        # Create content with metadata
+        title_suffix = " 🌐 (Đã dịch)" if is_translated else ""
+        main_title = f"📖 Chi tiết bài viết{title_suffix}"
+        
+        # Enhanced metadata
+        content_with_meta = f"**📰 Tiêu đề:** {news['title']}\n"
+        content_with_meta += f"**🕰️ Thời gian:** {news['published_str']} ({get_current_date_str()})\n"
+        content_with_meta += f"**📰 Nguồn:** {source_name}{'🌐' if is_translated else ''}\n"
+        
+        if is_translated:
+            content_with_meta += f"**🔄 Auto-Translate:** Groq AI đã dịch từ tiếng Anh\n\n"
+        
+        content_with_meta += f"**📄 Nội dung chi tiết:**\n{translated_content}"
+        
+        # Tự động split thành nhiều embeds khi content dài
+        optimized_embeds = create_comprehensive_embeds(main_title, content_with_meta, 0x9932cc)
+        
+        # Add link to last embed
+        if optimized_embeds:
+            safe_name, safe_value = validate_embed_field(
+                "🔗 Đọc bài viết gốc",
+                f"[Nhấn để đọc bài viết gốc]({news['link']})"
+            )
+            optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
+            
+            total_chars = sum(len(embed.description or "") + sum(len(field.value) for field in embed.fields) for embed in optimized_embeds)
+            optimized_embeds[-1].set_footer(text=f"📖 Content • {total_chars:,} ký tự • Tin số {news_number} • {len(optimized_embeds)} phần")
+        
+        # Send all embeds with progress tracking
+        for i, embed in enumerate(optimized_embeds, 1):
+            if i == 1:
+                await ctx.send(embed=embed)
+            else:
+                await asyncio.sleep(0.5)
+                await ctx.send(embed=embed)
+        
+    except ValueError:
+        await ctx.send("❌ Vui lòng nhập số! Ví dụ: `!chitiet 5`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+def create_comprehensive_embeds(title: str, content: str, color: int = 0x9932cc) -> List[discord.Embed]:
+    """Tạo embeds cho nội dung - tự động split không giới hạn độ dài"""
+    embeds = []
+    
+    content_parts = split_text_comprehensive(content, 800)
+    
+    for i, part in enumerate(content_parts):
+        if i == 0:
+            embed = discord.Embed(
+                title=validate_and_truncate_content(title, DISCORD_EMBED_TITLE_LIMIT),
+                color=color,
+                timestamp=get_current_vietnam_datetime()
+            )
+        else:
+            embed = discord.Embed(
+                title=validate_and_truncate_content(f"{title[:150]}... (Phần {i+1}/{len(content_parts)})", DISCORD_EMBED_TITLE_LIMIT),
+                color=color,
+                timestamp=get_current_vietnam_datetime()
+            )
+        
+        if i == 0:
+            field_name = f"📄 Nội dung {f'(Phần {i+1}/{len(content_parts)})' if len(content_parts) > 1 else ''}"
+            safe_field_name, safe_field_value = validate_embed_field(field_name, part)
+            embed.add_field(name=safe_field_name, value=safe_field_value, inline=False)
+        else:
+            safe_description = validate_and_truncate_content(part, DISCORD_EMBED_DESCRIPTION_LIMIT)
+            embed.description = safe_description
+        
+        embeds.append(embed)
+    
+    return embeds
+
+def split_text_comprehensive(text: str, max_length: int = 800) -> List[str]:
+    """Split text cho comprehensive content"""
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    
+    # Try to split by paragraphs first
+    paragraphs = text.split('\n\n')
+    
+    for paragraph in paragraphs:
+        if len(paragraph) > max_length:
+            sentences = paragraph.split('. ')
+            
+            for sentence in sentences:
+                if len(current_part + sentence + '. ') <= max_length:
+                    current_part += sentence + '. '
+                else:
+                    if current_part:
+                        parts.append(current_part.strip())
+                        current_part = sentence + '. '
+                    else:
+                        words = sentence.split(' ')
+                        for word in words:
+                            if len(current_part + word + ' ') <= max_length:
+                                current_part += word + ' '
+                            else:
+                                if current_part:
+                                    parts.append(current_part.strip())
+                                    current_part = word + ' '
+                                else:
+                                    parts.append(word[:max_length])
+                                    current_part = word[max_length:] + ' '
+        else:
+            if len(current_part + paragraph + '\n\n') <= max_length:
+                current_part += paragraph + '\n\n'
+            else:
+                if current_part:
+                    parts.append(current_part.strip())
+                    current_part = paragraph + '\n\n'
+                else:
+                    parts.append(paragraph)
+    
+    if current_part:
+        parts.append(current_part.strip())
+    
+    return parts
+
+@bot.command(name='menu')
+async def help_command_simplified(ctx):
+    """Simplified menu guide"""
+    current_datetime_str = get_current_datetime_str()
+    
+    main_embed = create_safe_embed(
+        "🤖 News Bot",
+        f"Bot tin tức AI với Yahoo Finance - {current_datetime_str}",
+        0xff9900
+    )
+    
+    ai_count = len(debate_engine.available_engines)
+    if ai_count >= 1:
+        ai_status = f"🤖 **{ai_count} AI Engine sẵn sàng**"
+    else:
+        ai_status = "⚠️ Cần AI engine để hoạt động"
+    
+    safe_name, safe_value = validate_embed_field("🤖 AI Status", ai_status)
+    main_embed.add_field(name=safe_name, value=safe_value, inline=False)
+    
+    safe_name2, safe_value2 = validate_embed_field(
+        "🤖 AI Commands",
+        f"**!hoi [câu hỏi]** - AI trả lời với dữ liệu {get_current_date_str()}\n**!hoi chitiet [số] [type] [question]** - Phân tích bài báo\n*VD: !hoi chitiet 5 out tại sao?*"
+    )
+    main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
+    
+    safe_name3, safe_value3 = validate_embed_field(
+        "📰 News Commands",
+        f"**!all [trang]** - Tin từ tất cả nguồn (12 tin/trang)\n**!in [trang]** - Tin trong nước\n**!out [trang]** - Tin quốc tế (Yahoo Finance)\n**!chitiet [số]** - Chi tiết bài viết"
+    )
+    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
+    
+    safe_name4, safe_value4 = validate_embed_field(
+        "🎯 Examples",
+        f"**!hoi giá vàng hôm nay** - AI tìm giá vàng {get_current_date_str()}\n**!all** - Xem tin mới nhất\n**!chitiet 1** - Chi tiết tin số 1"
+    )
+    main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
+    
+    total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+    safe_name5, safe_value5 = validate_embed_field(
+        "📊 Sources", 
+        f"🇻🇳 **Trong nước**: {len(RSS_FEEDS['domestic'])} nguồn\n🌍 **Quốc tế**: Yahoo Finance\n📊 **Tổng**: {total_sources} nguồn"
+    )
+    main_embed.add_field(name=safe_name5, value=safe_value5, inline=True)
+    
+    main_embed.set_footer(text=f"🤖 News Bot • {current_datetime_str}")
+    await ctx.send(embed=main_embed)
+
+# Cleanup function
+async def cleanup_enhanced():
+    """Enhanced cleanup"""
+    if debate_engine:
+        await debate_engine.close_session()
+    
+    global user_news_cache
+    if len(user_news_cache) > MAX_CACHE_ENTRIES:
+        user_news_cache.clear()
+
+# Main execution
+if __name__ == "__main__":
+    try:
+        keep_alive()
+        print("🚀 Starting News Bot...")
+        
+        ai_count = len(debate_engine.available_engines)
+        current_datetime_str = get_current_datetime_str()
+        
+        if ai_count >= 1:
+            ai_names = [debate_engine.ai_engines[ai]['name'] for ai in debate_engine.available_engines]
+            print(f"🤖 AI ready: {', '.join(ai_names)}")
+        else:
+            print("⚠️ Warning: Need at least 1 AI engine")
+        
+        total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+        print(f"📊 {total_sources} sources loaded (VN: {len(RSS_FEEDS['domestic'])}, International: {len(RSS_FEEDS['international'])})")
+        
+        print(f"✅ News Bot ready!")
+        print(f"💡 Use !menu for guide")
+        
+        bot.run(TOKEN)
+        
+    except discord.LoginFailure:
+        print("❌ Discord login error!")
+        print("🔧 Check DISCORD_TOKEN in Environment Variables")
+        
+    except Exception as e:
+        print(f"❌ Bot startup error: {e}")
+        
+    finally:
+        try:
+            asyncio.run(cleanup_enhanced())
+        except:
+            pass
+    ]
+    
+    for pattern in unwanted_patterns:
+        content = re.sub(pattern, '', content, flags=re.IGNORECASE | re.MULTILINE)
+    
+    return content.strip()
+
 # 🚀 MEMORY MANAGEMENT AND CLEANUP (MISSING)
 def cleanup_user_cache():
     """Clean up old user cache entries"""
@@ -3296,7 +4543,7 @@ def create_fallback_content(url, source_name, error_msg=""):
         article_id = url.split('/')[-1] if '/' in url else 'news-article'
         
         if 'yahoo' in source_name.lower():
-            return f"""**Yahoo Finance News Analysis:**
+            fallback_text = f"""**Yahoo Finance News Analysis:**
 
 📈 **Financial Market Insights:** This article provides financial market analysis and economic insights from Yahoo Finance, a leading financial information platform.
 
@@ -3312,11 +4559,14 @@ def create_fallback_content(url, source_name, error_msg=""):
 • Integration with major financial data providers
 
 **Article ID:** {article_id}
-**Note:** For complete article with interactive charts and real-time data, please visit the original link.
-
-{f'**Error:** {error_msg}' if error_msg else ''}"""
+**Note:** For complete article with interactive charts and real-time data, please visit the original link."""
+            
+            if error_msg:
+                fallback_text += f"\n\n**Error:** {error_msg}"
+            
+            return fallback_text
         else:
-            return f"""**Bản tin kinh tế Việt Nam:**
+            fallback_text = f"""**Bản tin kinh tế Việt Nam:**
 
 📰 **Thông tin kinh tế:** Bài viết cung cấp thông tin kinh tế, tài chính mới nhất từ {source_name}, một trong những nguồn tin uy tín về kinh tế Việt Nam.
 
@@ -3332,12 +4582,18 @@ def create_fallback_content(url, source_name, error_msg=""):
 • Kết nối với thị trường tài chính Việt Nam
 
 **Mã bài viết:** {article_id}
-**Lưu ý:** Để đọc đầy đủ bài viết với biểu đồ và dữ liệu chi tiết, vui lòng truy cập link gốc.
-
-{f'**Lỗi:** {error_msg}' if error_msg else ''}"""
+**Lưu ý:** Để đọc đầy đủ bài viết với biểu đồ và dữ liệu chi tiết, vui lòng truy cập link gốc."""
+            
+            if error_msg:
+                fallback_text += f"\n\n**Lỗi:** {error_msg}"
+            
+            return fallback_text
         
     except Exception as e:
-        return f"Thông tin về {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ bài viết. {f'Lỗi: {error_msg}' if error_msg else ''}"
+        base_text = f"Thông tin về {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ bài viết."
+        if error_msg:
+            base_text += f" Lỗi: {error_msg}"
+        return base_text
 
 # ENHANCED !HOI COMMAND
 @bot.command(name='hoi')
