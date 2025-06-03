@@ -382,12 +382,12 @@ async def fetch_content_legacy_domestic(response, session):
         except:
             content = raw_content.decode('utf-8', errors='ignore')
         
-        # Enhanced HTML cleaning for Vietnamese sites
-        clean_content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        clean_content = re.sub(r'<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
-        clean_content = re.sub(r'<[^>]+>', ' ', clean_content)
+        # Enhanced HTML cleaning for Vietnamese sites - NO RAW STRINGS
+        clean_content = re.sub('<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub('<style[^>]*>.*?</style>', '', clean_content, flags=re.DOTALL | re.IGNORECASE)
+        clean_content = re.sub('<[^>]+>', ' ', clean_content)
         clean_content = html.unescape(clean_content)
-        clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+        clean_content = re.sub('\s+', ' ', clean_content).strip()
         
         # Extract meaningful content
         sentences = clean_content.split('. ')
@@ -406,7 +406,7 @@ async def fetch_content_legacy_domestic(response, session):
         session.close()
         return None
 
-# 🚀 ENHANCED CONTENT EXTRACTION WITH FALLBACK SYSTEM (MISSING)
+# 🚀 ENHANCED CONTENT EXTRACTION WITH FALLBACK SYSTEM
 async def fetch_content_with_yahoo_finance_fallback(url, source_name="", news_item=None):
     """Enhanced content extraction with Yahoo Finance fallback"""
     
@@ -443,35 +443,31 @@ async def fetch_content_with_yahoo_finance_fallback(url, source_name="", news_it
                 
                 if yahoo_content and len(yahoo_content) > 500:
                     # Add enhanced fallback indicator
-                    fallback_content = f"""**🔍 Yahoo Finance Fallback Content:**
-
-{yahoo_content}
-
-**🚀 Fallback Information:**
-**Original Source:** {source_name}
-**Fallback Source:** Yahoo Finance (Enhanced)  
-**Match Quality:** {match['match_score']:.0%} similarity
-**Technology:** Enhanced extraction system
-
-**📊 Enhanced Features:**
-• Aggressive fallback triggering (requires 500+ chars)
-• Multiple search strategies and match attempts
-• Enhanced Yahoo Finance extraction
-• Real-time financial content delivery
-
-**Links:**
-**Original Article:** [Link gốc]({url})
-**Yahoo Finance Source:** [Link tham khảo]({match['link']})"""
+                    fallback_content = "**🔍 Yahoo Finance Fallback Content:**\n\n"
+                    fallback_content += yahoo_content + "\n\n"
+                    fallback_content += "**🚀 Fallback Information:**\n"
+                    fallback_content += f"**Original Source:** {source_name}\n"
+                    fallback_content += "**Fallback Source:** Yahoo Finance (Enhanced)\n"
+                    fallback_content += f"**Match Quality:** {match['match_score']:.0%} similarity\n"
+                    fallback_content += "**Technology:** Enhanced extraction system\n\n"
+                    fallback_content += "**📊 Enhanced Features:**\n"
+                    fallback_content += "• Aggressive fallback triggering (requires 500+ chars)\n"
+                    fallback_content += "• Multiple search strategies and match attempts\n"
+                    fallback_content += "• Enhanced Yahoo Finance extraction\n"
+                    fallback_content += "• Real-time financial content delivery\n\n"
+                    fallback_content += "**Links:**\n"
+                    fallback_content += f"**Original Article:** [Link gốc]({url})\n"
+                    fallback_content += f"**Yahoo Finance Source:** [Link tham khảo]({match['link']})"
                     
                     return fallback_content
     
     # Step 4: Return original content with warning if too short
     if content and len(content) < 500:
-        return f"""**⚠️ Nội dung ngắn được trích xuất:**
-
-{content}
-
-**📋 Lưu ý:** Nội dung này có thể chỉ là phần tóm tắt hoặc đoạn mở đầu. Để đọc đầy đủ bài viết, vui lòng truy cập link gốc bên dưới."""
+        warning_content = "**⚠️ Nội dung ngắn được trích xuất:**\n\n"
+        warning_content += content + "\n\n"
+        warning_content += "**📋 Lưu ý:** Nội dung này có thể chỉ là phần tóm tắt hoặc đoạn mở đầu. "
+        warning_content += "Để đọc đầy đủ bài viết, vui lòng truy cập link gốc bên dưới."
+        return warning_content
     
     return content or "Không thể trích xuất nội dung từ bài viết này."
 
@@ -529,8 +525,7 @@ def calculate_title_similarity(title1, title2):
     return len(intersection) / len(union) if union else 0
 
 def normalize_title(title):
-    """Chuẩn hóa tiêu đề để so sánh trùng lặp"""
-    import re
+    """Chuẩn hóa tiêu đề để so sánh trùng lặp - FIXED"""
     title = title.lower()
     title = re.sub(r'[^\w\s]', '', title)
     title = ' '.join(title.split())
@@ -621,7 +616,7 @@ async def search_yahoo_finance_by_title(title: str, max_results: int = 5):
         return []
 
 def extract_title_keywords_enhanced(title):
-    """Enhanced keyword extraction for better matching"""
+    """Enhanced keyword extraction for better matching - SIMPLE VERSION"""
     stop_words = {
         'và', 'của', 'trong', 'với', 'từ', 'về', 'có', 'sẽ', 'đã', 'được', 'cho', 'tại', 'theo', 'như', 'này', 'đó', 'các', 'một', 'hai', 'ba',
         'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 
@@ -629,15 +624,15 @@ def extract_title_keywords_enhanced(title):
         'said', 'says', 'after', 'before', 'up', 'down', 'out', 'over', 'under', 'again', 'further', 'then', 'once'
     }
     
-    title_clean = re.sub(r'[^\w\s]', ' ', title.lower())
+    title_clean = re.sub('[^\w\s]', ' ', title.lower())
     title_clean = ' '.join(title_clean.split())
     
     words = [word.strip() for word in title_clean.split() if len(word) > 2 and word not in stop_words]
     
     return words[:15]
 
-def calculate_title_similarity_enhanced(title1: str, title2: str) -> float:
-    """Enhanced title similarity calculation"""
+def calculate_title_similarity_enhanced(title1, title2):
+    """Enhanced title similarity calculation - SIMPLE VERSION"""
     keywords1 = set(extract_title_keywords_enhanced(title1))
     keywords2 = set(extract_title_keywords_enhanced(title2))
     
@@ -793,7 +788,7 @@ def clean_yahoo_finance_ads(content):
     if not content:
         return content
     
-    # Remove common Yahoo Finance ad patterns
+    # Remove common Yahoo Finance ad patterns - FIXED
     ad_patterns = [
         r'Yahoo Finance.*?Premium.*?',
         r'Sign in.*?Account.*?',
@@ -1790,7 +1785,7 @@ async def get_article_from_cache(user_id, article_context):
         elif requested_type == 'out' and 'out_page' not in cached_command:
             return None, f"Bạn cần xem tin tức với !out {requested_page} trước khi phân tích."
         
-        # Check page number
+        # Check for page number - NO RAW STRINGS
         cached_page = 1
         if '_page_' in cached_command:
             try:
