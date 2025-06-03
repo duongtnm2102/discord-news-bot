@@ -833,7 +833,7 @@ def clean_yahoo_finance_ads(content):
         r'Subscribe to our.*?',
         r'Newsletter.*?',
         r'Email updates.*?',
-        r'Breaking news.*?alerts.*?',
+        r'Breaking news.*?alerts.*?'
     ]
     
     # Apply all ad removal patterns
