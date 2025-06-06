@@ -373,6 +373,22 @@ def scrape_yahoo_finance_news(base_url, limit=20):  # Reduced limit from 30
         
         for selector in article_selectors:
             try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            generation_config = genai.types.GenerationConfig(
+                temperature=0.1,
+                top_p=0.8,
+                max_output_tokens=2500,
+            )
+            
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    extraction_prompt,
+                    generation_config=generation_config
+                ),
+                timeout=25  # Reduced timeout
+            )
                 elements = soup.select(selector)[:limit]  # Limit early
                 for element in elements:
                     try:
