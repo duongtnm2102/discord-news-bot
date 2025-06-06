@@ -46,7 +46,7 @@ try:
 except ImportError:
     WIKIPEDIA_AVAILABLE = False
 
-# 🆕 GEMINI ONLY - Enhanced AI System
+# 🆕 GEMINI ONLY - Enhanced AI System with Direct Content Access
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -78,6 +78,7 @@ DISCORD_EMBED_TOTAL_EMBED_LIMIT = 5800
 user_news_cache = {}
 user_last_detail_cache = {}
 global_seen_articles = {}  # Global deduplication cache
+scraped_news_cache = {}    # Cache for scraped news from Yahoo Finance
 MAX_CACHE_ENTRIES = 25
 MAX_GLOBAL_CACHE = 1000
 
@@ -87,8 +88,7 @@ USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'curl/7.68.0'
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 ]
 
 def get_current_vietnam_datetime():
@@ -110,7 +110,7 @@ def get_current_datetime_str():
     current_dt = get_current_vietnam_datetime()
     return current_dt.strftime("%H:%M %d/%m/%Y")
 
-print("🚀 ENHANCED YAHOO FINANCE BOT:")
+print("🚀 GEMINI-POWERED YAHOO FINANCE BOT:")
 print(f"DISCORD_TOKEN: {'✅ Found' if TOKEN else '❌ Missing'}")
 print(f"GEMINI_API_KEY: {'✅ Found' if GEMINI_API_KEY else '❌ Missing'}")
 print(f"🔧 Current Vietnam time: {get_current_datetime_str()}")
@@ -120,7 +120,7 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 ENHANCED YAHOO FINANCE RSS FEEDS - Multiple Categories
+# 🔧 ENHANCED FEEDS - RSS + Direct Scraping
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -131,29 +131,18 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - ENHANCED YAHOO FINANCE URLs ===
+    # === QUỐC TẾ - Enhanced Yahoo Finance RSS + Direct Scraping ===
     'international': {
-        # Main RSS Feeds
+        # Working RSS Feeds
         'yahoo_finance_main': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_headlines': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         
-        # Topic-based RSS Feeds
-        'yahoo_finance_stocks': 'https://feeds.finance.yahoo.com/rss/2.0/category-stocks',
-        'yahoo_finance_crypto': 'https://feeds.finance.yahoo.com/rss/2.0/category-crypto',
-        'yahoo_finance_tech': 'https://feeds.finance.yahoo.com/rss/2.0/category-tech',
-        'yahoo_finance_economy': 'https://feeds.finance.yahoo.com/rss/2.0/category-economy',
-        'yahoo_finance_business': 'https://feeds.finance.yahoo.com/rss/2.0/category-business',
-        'yahoo_finance_markets': 'https://feeds.finance.yahoo.com/rss/2.0/category-markets',
-        
-        # Sector-specific RSS Feeds  
-        'yahoo_finance_energy': 'https://feeds.finance.yahoo.com/rss/2.0/category-energy',
-        'yahoo_finance_healthcare': 'https://feeds.finance.yahoo.com/rss/2.0/category-healthcare',
-        'yahoo_finance_finance_sector': 'https://feeds.finance.yahoo.com/rss/2.0/category-financial',
-        'yahoo_finance_consumer': 'https://feeds.finance.yahoo.com/rss/2.0/category-consumer',
-        
-        # Alternative working URLs
-        'yahoo_finance_alt1': 'https://finance.yahoo.com/rss/topstories',
-        'yahoo_finance_alt2': 'https://finance.yahoo.com/rss/mostviewed'
+        # Direct Scraping Sources
+        'yahoo_finance_direct': 'https://finance.yahoo.com/news/',
+        'yahoo_finance_latest': 'https://finance.yahoo.com/topic/latest-news/',
+        'yahoo_finance_markets': 'https://finance.yahoo.com/topic/stock-market-news/',
+        'yahoo_finance_crypto_news': 'https://finance.yahoo.com/topic/crypto/',
+        'yahoo_finance_economy_news': 'https://finance.yahoo.com/topic/economic-news/'
     }
 }
 
@@ -283,7 +272,7 @@ def get_enhanced_headers(url=None):
     
     headers = {
         'User-Agent': user_agent,
-        'Accept': 'application/rss+xml, application/xml, text/xml, text/html, application/xhtml+xml, */*',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
@@ -316,10 +305,126 @@ def add_random_delay():
     delay = random.uniform(0.5, 2.0)
     time.sleep(delay)
 
-# 🚀 ENHANCED CONTENT EXTRACTION WITH GEMINI TRANSLATION
-async def extract_content_enhanced(url, source_name, news_item=None):
-    """Enhanced content extraction with Gemini translation for international news"""
+# 🆕 DIRECT YAHOO FINANCE NEWS SCRAPING
+def scrape_yahoo_finance_news(base_url, limit=30):
+    """Scrape news directly from Yahoo Finance news pages"""
+    try:
+        print(f"🔄 Direct scraping: {base_url}")
+        add_random_delay()
+        
+        session = requests.Session()
+        headers = get_enhanced_headers(base_url)
+        session.headers.update(headers)
+        
+        response = session.get(base_url, timeout=15, allow_redirects=True)
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to scrape {base_url}: {response.status_code}")
+            return []
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Enhanced selectors for Yahoo Finance news articles
+        news_articles = []
+        
+        # Method 1: Look for news article containers
+        article_selectors = [
+            'h3 > a[href*="/news/"]',          # News article links in h3
+            'a[href*="/news/"][data-module]',   # Links with data-module
+            'h3 a',                             # All h3 links
+            'div[data-testid] a[href*="/news/"]', # Test ID containers
+            '.js-content-viewer',               # Content viewer links
+            '[href*="/news/"] h3',              # News links with h3
+            'h2 a[href*="/news/"]'              # H2 news links
+        ]
+        
+        for selector in article_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements[:limit]:
+                    try:
+                        # Extract title and link
+                        if element.name == 'a':
+                            title = element.get_text(strip=True)
+                            link = element.get('href', '')
+                        else:
+                            # If it's h3 or other element, find the link inside
+                            link_elem = element.find('a') if element.name != 'a' else element
+                            if not link_elem:
+                                continue
+                            title = link_elem.get_text(strip=True)
+                            link = link_elem.get('href', '')
+                        
+                        # Clean and validate
+                        if not title or not link or len(title) < 10:
+                            continue
+                        
+                        # Fix relative URLs
+                        if link.startswith('/'):
+                            link = f"https://finance.yahoo.com{link}"
+                        elif not link.startswith('http'):
+                            continue
+                        
+                        # Filter for financial/economic content
+                        if is_relevant_financial_news(title):
+                            news_item = {
+                                'title': html.unescape(title.strip()),
+                                'link': link,
+                                'source': f"yahoo_finance_scraped_{selector.replace(' ', '_').replace('[', '').replace(']', '').replace('*', '').replace('=', '').replace('\"', '').replace('/', '')}",
+                                'published': get_current_vietnam_datetime(),
+                                'published_str': get_current_vietnam_datetime().strftime("%H:%M %d/%m"),
+                                'description': title[:200] + "..." if len(title) > 200 else title
+                            }
+                            
+                            # Check for duplicates
+                            if not is_duplicate_article(news_item, news_item['source']):
+                                news_articles.append(news_item)
+                        
+                    except Exception as e:
+                        continue
+                
+                if len(news_articles) >= limit:
+                    break
+                    
+            except Exception as e:
+                continue
+        
+        session.close()
+        print(f"✅ Scraped {len(news_articles)} unique articles from {base_url}")
+        return news_articles[:limit]
+        
+    except Exception as e:
+        print(f"❌ Scraping error for {base_url}: {e}")
+        return []
+
+def is_relevant_financial_news(title):
+    """Filter for relevant financial/economic news based on title"""
+    financial_keywords = [
+        'stock', 'market', 'trading', 'investment', 'investor', 'wall street',
+        'nasdaq', 'dow', 's&p', 'earnings', 'revenue', 'profit', 'loss',
+        'financial', 'finance', 'economy', 'economic', 'fed', 'federal reserve',
+        'interest rate', 'inflation', 'gdp', 'unemployment', 'jobs report',
+        'bitcoin', 'crypto', 'cryptocurrency', 'ethereum', 'bank', 'banking',
+        'ipo', 'merger', 'acquisition', 'dividend', 'bond', 'treasury',
+        'currency', 'dollar', 'euro', 'commodity', 'oil', 'gold', 'silver',
+        'real estate', 'housing', 'mortgage', 'credit', 'debt', 'loan',
+        'retail', 'consumer', 'spending', 'sales', 'manufacturing', 'industrial',
+        'tech', 'technology', 'ai', 'artificial intelligence', 'startup',
+        'venture capital', 'hedge fund', 'mutual fund', 'etf', 'pension'
+    ]
     
+    title_lower = title.lower()
+    return any(keyword in title_lower for keyword in financial_keywords)
+
+# 🚀 ENHANCED CONTENT EXTRACTION - CafeF uses traditional, Yahoo Finance uses Gemini
+async def extract_content_enhanced(url, source_name, news_item=None):
+    """Enhanced content extraction - Gemini for international, traditional for domestic"""
+    
+    # For international (Yahoo Finance) sources, use Gemini
+    if is_international_source(source_name):
+        return await extract_content_with_gemini(url, source_name)
+    
+    # For domestic (CafeF) sources, use traditional methods
     try:
         add_random_delay()
         session = requests.Session()
@@ -344,12 +449,6 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                     if result and result.get('text') and len(result['text']) > 300:
                         content = result['text']
                         session.close()
-                        
-                        # Enhanced Gemini translation for international news
-                        if is_international_source(source_name):
-                            translated_content = await translate_with_gemini(content, source_name)
-                            return translated_content if translated_content else content
-                        
                         return content.strip()
                 except Exception as e:
                     pass
@@ -368,29 +467,20 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                     article.parse()
                     
                     if article.text and len(article.text) > 300:
-                        content = article.text
-                        
-                        # Enhanced Gemini translation for international news
-                        if is_international_source(source_name):
-                            translated_content = await translate_with_gemini(content, source_name)
-                            return translated_content if translated_content else content
-                        
-                        return content.strip()
+                        return article.text.strip()
                 
                 except Exception as e:
                     pass
             
-            # Method 3: BeautifulSoup
+            # Method 3: BeautifulSoup for CafeF
             if BEAUTIFULSOUP_AVAILABLE:
                 try:
                     soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    # Enhanced selectors for both CafeF and Yahoo Finance
+                    # CafeF-specific selectors
                     content_selectors = [
-                        '[data-testid="article-content"]',  # Yahoo Finance
-                        'div.caas-body',  # Yahoo Finance
-                        'div.detail-content',  # CafeF
-                        'div.fck_detail',  # CafeF
+                        'div.detail-content',
+                        'div.fck_detail',
                         'div.content-detail',
                         'div.article-content',
                         'div.entry-content',
@@ -412,16 +502,8 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                                 break
                     
                     if content and len(content) > 500:
-                        # Clean content
                         content = clean_content_enhanced(content)
-                        
                         session.close()
-                        
-                        # Enhanced Gemini translation for international news
-                        if is_international_source(source_name):
-                            translated_content = await translate_with_gemini(content, source_name)
-                            return translated_content if translated_content else content
-                        
                         return content.strip()
                         
                 except Exception as e:
@@ -433,17 +515,71 @@ async def extract_content_enhanced(url, source_name, news_item=None):
     except Exception as e:
         return create_fallback_content(url, source_name, str(e))
 
+# 🆕 GEMINI CONTENT EXTRACTION FOR INTERNATIONAL NEWS
+async def extract_content_with_gemini(url, source_name):
+    """Use Gemini to extract and translate content from international news"""
+    try:
+        if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
+            return create_fallback_content(url, source_name, "Gemini không khả dụng")
+        
+        extraction_prompt = f"""Bạn là chuyên gia trích xuất và dịch thuật tin tức tài chính. Hãy truy cập link bài báo sau và thực hiện:
+
+**LINK BÀI BÁO:** {url}
+
+**YÊU CẦU:**
+1. Truy cập và đọc TOÀN BỘ nội dung bài báo từ link
+2. Trích xuất nội dung chính (bỏ quảng cáo, sidebar, footer)
+3. Dịch từ tiếng Anh sang tiếng Việt một cách tự nhiên và chính xác
+4. Giữ nguyên các con số, phần trăm, tên công ty, thuật ngữ tài chính
+5. Sử dụng thuật ngữ kinh tế-tài chính tiếng Việt chuẩn
+6. KHÔNG thêm giải thích hay bình luận cá nhân
+7. Trả về nội dung đã dịch với cấu trúc rõ ràng
+
+**GHI CHÚ:** Chỉ trả về nội dung bài báo đã được dịch, không cần giải thích quá trình.
+
+**NỘI DUNG ĐÃ DỊCH:**"""
+
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            generation_config = genai.types.GenerationConfig(
+                temperature=0.1,
+                top_p=0.8,
+                max_output_tokens=2500,
+            )
+            
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    extraction_prompt,
+                    generation_config=generation_config
+                ),
+                timeout=30
+            )
+            
+            extracted_content = response.text.strip()
+            
+            # Validate content quality
+            if len(extracted_content) > 200 and 'không thể truy cập' not in extracted_content.lower():
+                return f"[🤖 Gemini đã trích xuất và dịch] {extracted_content}"
+            else:
+                return create_fallback_content(url, source_name, "Gemini không thể trích xuất nội dung")
+            
+        except asyncio.TimeoutError:
+            return create_fallback_content(url, source_name, "Gemini timeout")
+        except Exception as e:
+            return create_fallback_content(url, source_name, f"Lỗi Gemini: {str(e)}")
+            
+    except Exception as e:
+        return create_fallback_content(url, source_name, str(e))
+
 def clean_content_enhanced(content):
-    """Enhanced content cleaning for both CafeF and Yahoo Finance"""
+    """Enhanced content cleaning for CafeF"""
     if not content:
         return content
     
     # Remove common patterns
     unwanted_patterns = [
-        r'Subscribe.*?Premium.*?',
-        r'Sign in.*?Account.*?',
-        r'Advertisement.*?',
-        r'Quảng cáo.*?',
         r'Theo.*?CafeF.*?',
         r'Nguồn.*?:.*?',
         r'Tags:.*?$',
@@ -505,171 +641,47 @@ def create_fallback_content(url, source_name, error_msg=""):
     except Exception as e:
         return f"Nội dung từ {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ."
 
-# 🆕 GEMINI TRANSLATION SYSTEM
-async def translate_with_gemini(content: str, source_name: str):
-    """Enhanced Gemini translation for international news"""
-    try:
-        if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
-            return None
-        
-        # Enhanced detection for English content
-        english_indicators = ['the', 'and', 'is', 'are', 'was', 'were', 'have', 'has', 
-                            'will', 'market', 'price', 'stock', 'financial', 'economic',
-                            'company', 'business', 'trade', 'investment', 'percent']
-        content_lower = content.lower()
-        english_word_count = sum(1 for word in english_indicators if f' {word} ' in f' {content_lower} ')
-        
-        if english_word_count < 3:
-            return None  # Not English content
-        
-        translation_prompt = f"""Bạn là chuyên gia dịch thuật kinh tế-tài chính. Hãy dịch bài báo tiếng Anh sau sang tiếng Việt một cách chính xác và tự nhiên.
-
-YÊU CẦU DỊCH:
-1. Giữ nguyên ý nghĩa và ngữ cảnh kinh tế
-2. Sử dụng thuật ngữ kinh tế tiếng Việt chuẩn
-3. Dịch tự nhiên, không máy móc
-4. Giữ nguyên các con số, tỷ lệ phần trăm, tên công ty
-5. KHÔNG thêm giải thích hay bình luận
-6. Chỉ trả về bản dịch tiếng Việt
-
-BÀI BÁO CẦN DỊCH:
-{content[:2000]}
-
-BẢN DỊCH TIẾNG VIỆT:"""
-
-        try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
-            generation_config = genai.types.GenerationConfig(
-                temperature=0.1,
-                top_p=0.8,
-                max_output_tokens=1500,
-            )
-            
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    model.generate_content,
-                    translation_prompt,
-                    generation_config=generation_config
-                ),
-                timeout=20
-            )
-            
-            translated_text = response.text.strip()
-            return f"[Đã dịch từ {source_name}] {translated_text}"
-            
-        except Exception as e:
-            return f"[Lỗi dịch từ {source_name}] {content[:1000]}..."
-            
-    except Exception as e:
-        return None
-
-# 🚀 ENHANCED NEWS COLLECTION WITH RETRY MECHANISM
-async def collect_news_enhanced(sources_dict, limit_per_source=20):
-    """Enhanced news collection with deduplication and retry mechanism"""
+# 🚀 ENHANCED NEWS COLLECTION WITH RSS + SCRAPING
+async def collect_news_enhanced(sources_dict, limit_per_source=25):
+    """Enhanced news collection with RSS feeds + direct scraping"""
     all_news = []
     
-    for source_name, rss_url in sources_dict.items():
+    for source_name, source_url in sources_dict.items():
         retry_count = 0
         max_retries = 3
         
         while retry_count < max_retries:
             try:
-                print(f"🔄 Fetching from {source_name} (attempt {retry_count + 1}): {rss_url}")
-                add_random_delay()
+                print(f"🔄 Processing {source_name} (attempt {retry_count + 1}): {source_url}")
                 
-                session = requests.Session()
-                headers = get_enhanced_headers(rss_url)
-                session.headers.update(headers)
+                # Determine if it's RSS or direct scraping
+                if source_url.endswith('.rss') or 'rss' in source_url.lower() or 'feeds.' in source_url:
+                    # RSS Feed processing
+                    news_items = await process_rss_feed(source_name, source_url, limit_per_source)
+                else:
+                    # Direct scraping for Yahoo Finance news pages
+                    news_items = scrape_yahoo_finance_news(source_url, limit_per_source)
                 
-                # Enhanced error handling with retries
-                feed = None
-                try:
-                    response = session.get(rss_url, timeout=15, allow_redirects=True)
-                    print(f"📊 {source_name} response: {response.status_code}")
+                if news_items:
+                    duplicates_found = 0
+                    for news_item in news_items:
+                        if not is_duplicate_article(news_item, source_name):
+                            all_news.append(news_item)
+                        else:
+                            duplicates_found += 1
                     
-                    if response.status_code == 200:
-                        feed = feedparser.parse(response.content)
-                    elif response.status_code in [403, 429]:
-                        print(f"⚠️ Rate limited for {source_name}, waiting...")
-                        time.sleep(random.uniform(3.0, 6.0))
-                        # Try with different user agent
-                        headers['User-Agent'] = random.choice(USER_AGENTS)
-                        session.headers.update(headers)
-                        response = session.get(rss_url, timeout=15, allow_redirects=True)
-                        if response.status_code == 200:
-                            feed = feedparser.parse(response.content)
-                    
-                    if not feed and response.status_code != 200:
-                        print(f"⚠️ {source_name} failed with {response.status_code}, trying direct parse...")
-                        feed = feedparser.parse(rss_url)
-                
-                except requests.exceptions.RequestException as e:
-                    print(f"⚠️ Request error for {source_name}: {e}")
-                    if retry_count < max_retries - 1:
-                        print(f"🔄 Retrying {source_name} in {(retry_count + 1) * 2} seconds...")
-                        time.sleep((retry_count + 1) * 2)
-                        retry_count += 1
-                        continue
-                    else:
-                        print(f"🔄 Trying direct feedparser for {source_name}...")
-                        feed = feedparser.parse(rss_url)
-                
-                session.close()
-                
-                if not feed or not hasattr(feed, 'entries') or len(feed.entries) == 0:
-                    print(f"❌ No entries for {source_name}")
+                    entries_processed = len(news_items) - duplicates_found
+                    print(f"✅ Processed {entries_processed} unique entries from {source_name} (skipped {duplicates_found} duplicates)")
+                    break  # Success, exit retry loop
+                else:
                     if retry_count < max_retries - 1:
                         retry_count += 1
+                        print(f"🔄 Retrying {source_name}...")
+                        time.sleep(2)
                         continue
                     else:
+                        print(f"❌ No content from {source_name} after {max_retries} attempts")
                         break
-                    
-                entries_processed = 0
-                duplicates_found = 0
-                
-                for entry in feed.entries[:limit_per_source]:
-                    try:
-                        vn_time = get_current_vietnam_datetime()
-                        
-                        if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                            vn_time = convert_utc_to_vietnam_time(entry.published_parsed)
-                        elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
-                            vn_time = convert_utc_to_vietnam_time(entry.updated_parsed)
-                        
-                        description = ""
-                        if hasattr(entry, 'summary'):
-                            description = entry.summary[:400] + "..." if len(entry.summary) > 400 else entry.summary
-                        elif hasattr(entry, 'description'):
-                            description = entry.description[:400] + "..." if len(entry.description) > 400 else entry.description
-                        
-                        if hasattr(entry, 'title') and hasattr(entry, 'link'):
-                            title = entry.title.strip()
-                            
-                            # Filter for relevant economic/financial content
-                            if is_relevant_news(title, description, source_name):
-                                news_item = {
-                                    'title': html.unescape(title),
-                                    'link': entry.link,
-                                    'source': source_name,
-                                    'published': vn_time,
-                                    'published_str': vn_time.strftime("%H:%M %d/%m"),
-                                    'description': html.unescape(description) if description else ""
-                                }
-                                
-                                # Check for duplicates
-                                if not is_duplicate_article(news_item, source_name):
-                                    all_news.append(news_item)
-                                    entries_processed += 1
-                                else:
-                                    duplicates_found += 1
-                        
-                    except Exception as entry_error:
-                        print(f"⚠️ Entry error for {source_name}: {entry_error}")
-                        continue
-                        
-                print(f"✅ Processed {entries_processed} unique entries from {source_name} (skipped {duplicates_found} duplicates)")
-                break  # Success, exit retry loop
                 
             except Exception as e:
                 print(f"❌ Error for {source_name}: {e}")
@@ -687,6 +699,75 @@ async def collect_news_enhanced(sources_dict, limit_per_source=20):
     all_news.sort(key=lambda x: x['published'], reverse=True)
     return all_news
 
+async def process_rss_feed(source_name, rss_url, limit_per_source):
+    """Process RSS feed with enhanced error handling"""
+    try:
+        add_random_delay()
+        session = requests.Session()
+        headers = get_enhanced_headers(rss_url)
+        session.headers.update(headers)
+        
+        response = session.get(rss_url, timeout=15, allow_redirects=True)
+        
+        if response.status_code == 200:
+            feed = feedparser.parse(response.content)
+        elif response.status_code in [403, 429]:
+            print(f"⚠️ Rate limited for {source_name}, waiting...")
+            time.sleep(random.uniform(3.0, 6.0))
+            headers['User-Agent'] = random.choice(USER_AGENTS)
+            session.headers.update(headers)
+            response = session.get(rss_url, timeout=15, allow_redirects=True)
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+            else:
+                feed = feedparser.parse(rss_url)
+        else:
+            feed = feedparser.parse(rss_url)
+        
+        session.close()
+        
+        if not feed or not hasattr(feed, 'entries') or len(feed.entries) == 0:
+            return []
+        
+        news_items = []
+        for entry in feed.entries[:limit_per_source]:
+            try:
+                vn_time = get_current_vietnam_datetime()
+                
+                if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                    vn_time = convert_utc_to_vietnam_time(entry.published_parsed)
+                elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
+                    vn_time = convert_utc_to_vietnam_time(entry.updated_parsed)
+                
+                description = ""
+                if hasattr(entry, 'summary'):
+                    description = entry.summary[:400] + "..." if len(entry.summary) > 400 else entry.summary
+                elif hasattr(entry, 'description'):
+                    description = entry.description[:400] + "..." if len(entry.description) > 400 else entry.description
+                
+                if hasattr(entry, 'title') and hasattr(entry, 'link'):
+                    title = entry.title.strip()
+                    
+                    # Filter for relevant economic/financial content
+                    if is_relevant_news(title, description, source_name):
+                        news_item = {
+                            'title': html.unescape(title),
+                            'link': entry.link,
+                            'source': source_name,
+                            'published': vn_time,
+                            'published_str': vn_time.strftime("%H:%M %d/%m"),
+                            'description': html.unescape(description) if description else ""
+                        }
+                        news_items.append(news_item)
+                
+            except Exception as entry_error:
+                continue
+        
+        return news_items
+        
+    except Exception as e:
+        return []
+
 def is_relevant_news(title, description, source_name):
     """Filter for relevant economic/financial news"""
     
@@ -696,19 +777,7 @@ def is_relevant_news(title, description, source_name):
     
     # For Yahoo Finance, filter for economic/financial keywords
     if 'yahoo_finance' in source_name:
-        economic_keywords = [
-            'economy', 'economic', 'gdp', 'inflation', 'fed', 'federal reserve',
-            'market', 'stock', 'bond', 'trading', 'investment', 'investor',
-            'financial', 'finance', 'bank', 'banking', 'earnings', 'revenue',
-            'profit', 'loss', 'company', 'corporate', 'business', 'merger',
-            'acquisition', 'ipo', 'dividend', 'interest rate', 'currency',
-            'real estate', 'property', 'housing', 'mortgage', 'commodity',
-            'oil', 'gold', 'bitcoin', 'crypto', 'policy', 'regulation',
-            'sector', 'tech', 'technology', 'healthcare', 'energy', 'consumer'
-        ]
-        
-        text_to_check = f"{title} {description}".lower()
-        return any(keyword in text_to_check for keyword in economic_keywords)
+        return is_relevant_financial_news(title)
     
     return True
 
@@ -1016,7 +1085,7 @@ async def on_ready():
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     
-    status_text = f"Enhanced Yahoo Finance • Gemini AI • {total_sources} sources • !menu"
+    status_text = f"Gemini-Powered Yahoo Finance • {total_sources} sources • !menu"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -1027,6 +1096,7 @@ async def on_ready():
     print(f"🤖 Gemini AI: {ai_status}")
     print(f"📊 News Sources: {total_sources} (CafeF: {len(RSS_FEEDS['domestic'])}, Yahoo Finance: {len(RSS_FEEDS['international'])})")
     print(f"🔄 Deduplication: Active")
+    print(f"🤖 Gemini Content Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}")
     print(f"🕰️ Started at: {current_datetime_str}")
 
 @bot.event
@@ -1044,13 +1114,13 @@ async def on_command_error(ctx, error):
 
 @bot.command(name='all')
 async def get_all_news_enhanced(ctx, page=1):
-    """Tin tức từ CafeF và Yahoo Finance với deduplication"""
+    """Tin tức từ CafeF và Yahoo Finance với Gemini-powered extraction"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn (RSS + Direct scraping)...")
         
-        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)
-        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 18)
+        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 25)
+        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 30)
         
         await loading_msg.delete()
         
@@ -1076,28 +1146,30 @@ async def get_all_news_enhanced(ctx, page=1):
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
-            'yahoo_finance_main': 'Yahoo Finance', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_stocks': 'Yahoo Stocks', 'yahoo_finance_crypto': 'Yahoo Crypto',
-            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_economy': 'Yahoo Economy',
-            'yahoo_finance_business': 'Yahoo Business', 'yahoo_finance_markets': 'Yahoo Markets',
-            'yahoo_finance_energy': 'Yahoo Energy', 'yahoo_finance_healthcare': 'Yahoo Healthcare',
-            'yahoo_finance_finance_sector': 'Yahoo Financial', 'yahoo_finance_consumer': 'Yahoo Consumer',
-            'yahoo_finance_alt1': 'Yahoo TopStories', 'yahoo_finance_alt2': 'Yahoo MostViewed'
+            'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
+            'yahoo_finance_direct': 'Yahoo Direct', 'yahoo_finance_latest': 'Yahoo Latest',
+            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
+            'yahoo_finance_economy_news': 'Yahoo Economy'
         }
         
         emoji_map = {
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_stocks': '📈',
-            'yahoo_finance_crypto': '₿', 'yahoo_finance_tech': '💻', 'yahoo_finance_economy': '🌍',
-            'yahoo_finance_business': '🏢', 'yahoo_finance_markets': '📊', 'yahoo_finance_energy': '⚡',
-            'yahoo_finance_healthcare': '🏥', 'yahoo_finance_finance_sector': '🏦', 'yahoo_finance_consumer': '🛒',
-            'yahoo_finance_alt1': '🔥', 'yahoo_finance_alt2': '👁️'
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_direct': '🔍',
+            'yahoo_finance_latest': '🆕', 'yahoo_finance_markets': '📊', 'yahoo_finance_crypto_news': '₿',
+            'yahoo_finance_economy_news': '🌍'
         }
         
+        # Fallback for scraped sources
+        for news in page_news:
+            if news['source'] not in source_names:
+                if 'yahoo_finance_scraped' in news['source']:
+                    source_names[news['source']] = 'Yahoo Scraped'
+                    emoji_map[news['source']] = '🚀'
+        
         # Add enhanced statistics
-        stats_field = f"🇻🇳 CafeF: {domestic_count} tin\n🌍 Yahoo Finance: {international_count} tin\n📊 Tổng có sẵn: {len(all_news)} tin\n🔄 Deduplication: Active"
-        fields_data.append(("📊 Thống kê Enhanced", stats_field))
+        stats_field = f"🇻🇳 CafeF: {domestic_count} tin\n🌍 Yahoo Finance: {international_count} tin\n📊 Tổng có sẵn: {len(all_news)} tin\n🤖 Gemini Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}"
+        fields_data.append(("📊 Thống kê Gemini-Powered", stats_field))
         
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '📰')
@@ -1111,7 +1183,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"📰 Tin tức tổng hợp Enhanced (Trang {page})",
+            f"📰 Tin tức tổng hợp Gemini-Powered (Trang {page})",
             "",
             fields_data,
             0x00ff88
@@ -1121,7 +1193,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"Enhanced Yahoo Finance • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+            embed.set_footer(text=f"🤖 Gemini-Powered Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1131,12 +1203,12 @@ async def get_all_news_enhanced(ctx, page=1):
 
 @bot.command(name='out')
 async def get_international_news_enhanced(ctx, page=1):
-    """Tin tức quốc tế - Enhanced Yahoo Finance với nhiều nguồn"""
+    """Tin tức quốc tế - Gemini-Powered Yahoo Finance với RSS + Direct Scraping"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['international'])} nguồn Yahoo Finance...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['international'])} nguồn Yahoo Finance (RSS + Scraping + Gemini)...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 18)
+        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 30)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1152,35 +1224,33 @@ async def get_international_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        # Count by category
-        category_counts = {}
-        for news in page_news:
-            category = news['source'].replace('yahoo_finance_', '').replace('_', ' ').title()
-            category_counts[category] = category_counts.get(category, 0) + 1
+        # Count by method
+        rss_count = sum(1 for news in page_news if 'scraped' not in news['source'])
+        scraped_count = len(page_news) - rss_count
         
-        stats_field = f"📰 Tổng tin Yahoo Finance: {len(news_list)} tin\n🌐 Auto-translate: Gemini AI\n🔄 Deduplication: Active\n📊 Nguồn: {len(RSS_FEEDS['international'])} RSS feeds"
-        if category_counts:
-            stats_field += f"\n📋 Phân loại: " + ", ".join([f"{k}({v})" for k, v in list(category_counts.items())[:3]])
-        fields_data.append(("📊 Thông tin Enhanced", stats_field))
+        stats_field = f"📰 Tổng tin Yahoo Finance: {len(news_list)} tin\n🤖 Gemini Content Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}\n📊 RSS: {rss_count} tin • 🔍 Scraped: {scraped_count} tin\n🌐 Auto-translate: Gemini AI"
+        fields_data.append(("📊 Thông tin Gemini-Powered", stats_field))
         
         # Enhanced source names
         source_names = {
-            'yahoo_finance_main': 'Yahoo Finance', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_stocks': 'Yahoo Stocks', 'yahoo_finance_crypto': 'Yahoo Crypto',
-            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_economy': 'Yahoo Economy',
-            'yahoo_finance_business': 'Yahoo Business', 'yahoo_finance_markets': 'Yahoo Markets',
-            'yahoo_finance_energy': 'Yahoo Energy', 'yahoo_finance_healthcare': 'Yahoo Healthcare',
-            'yahoo_finance_finance_sector': 'Yahoo Financial', 'yahoo_finance_consumer': 'Yahoo Consumer',
-            'yahoo_finance_alt1': 'Yahoo TopStories', 'yahoo_finance_alt2': 'Yahoo MostViewed'
+            'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
+            'yahoo_finance_direct': 'Yahoo Direct', 'yahoo_finance_latest': 'Yahoo Latest',
+            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
+            'yahoo_finance_economy_news': 'Yahoo Economy'
         }
         
         emoji_map = {
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_stocks': '📈',
-            'yahoo_finance_crypto': '₿', 'yahoo_finance_tech': '💻', 'yahoo_finance_economy': '🌍',
-            'yahoo_finance_business': '🏢', 'yahoo_finance_markets': '📊', 'yahoo_finance_energy': '⚡',
-            'yahoo_finance_healthcare': '🏥', 'yahoo_finance_finance_sector': '🏦', 'yahoo_finance_consumer': '🛒',
-            'yahoo_finance_alt1': '🔥', 'yahoo_finance_alt2': '👁️'
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_direct': '🔍',
+            'yahoo_finance_latest': '🆕', 'yahoo_finance_markets': '📊', 'yahoo_finance_crypto_news': '₿',
+            'yahoo_finance_economy_news': '🌍'
         }
+        
+        # Handle scraped sources
+        for news in page_news:
+            if news['source'] not in source_names:
+                if 'yahoo_finance_scraped' in news['source']:
+                    source_names[news['source']] = 'Yahoo Scraped'
+                    emoji_map[news['source']] = '🚀'
         
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '💰')
@@ -1194,7 +1264,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🌍 Tin kinh tế quốc tế Enhanced (Trang {page})",
+            f"🌍 Tin kinh tế quốc tế Gemini-Powered (Trang {page})",
             "",
             fields_data,
             0x0066ff
@@ -1204,7 +1274,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"Enhanced Yahoo Finance + Gemini AI • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+            embed.set_footer(text=f"🤖 Gemini-Powered Yahoo Finance • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1214,12 +1284,12 @@ async def get_international_news_enhanced(ctx, page=1):
 
 @bot.command(name='in')
 async def get_domestic_news_enhanced(ctx, page=1):
-    """Tin tức trong nước - CafeF"""
+    """Tin tức trong nước - CafeF với traditional extraction"""
     try:
         page = max(1, int(page))
         loading_msg = await ctx.send(f"⏳ Đang tải tin tức CafeF...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)
+        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 25)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1235,7 +1305,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN\n🔄 Deduplication: Active"
+        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN\n🔧 Extraction: Traditional methods (Trafilatura, Newspaper3k, BeautifulSoup)"
         fields_data.append(("📊 Thông tin", stats_field))
         
         source_names = {
@@ -1280,7 +1350,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
 
 @bot.command(name='chitiet')
 async def get_news_detail_enhanced(ctx, news_number: int):
-    """Chi tiết bài viết với Gemini enhanced extraction"""
+    """Chi tiết bài viết - Gemini cho tin nước ngoài, traditional cho tin trong nước"""
     try:
         user_id = ctx.author.id
         
@@ -1300,7 +1370,11 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Save as last detail for !hoi context
         save_user_last_detail(user_id, news)
         
-        loading_msg = await ctx.send(f"🚀 Đang trích xuất nội dung với enhanced system...")
+        # Determine extraction method based on source
+        if is_international_source(news['source']):
+            loading_msg = await ctx.send(f"🤖 Đang trích xuất nội dung với Gemini AI...")
+        else:
+            loading_msg = await ctx.send(f"🔧 Đang trích xuất nội dung với traditional methods...")
         
         # Enhanced content extraction
         full_content = await extract_content_enhanced(news['link'], news['source'], news)
@@ -1309,36 +1383,37 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         source_names = {
             'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
             'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
-            'yahoo_finance_main': 'Yahoo Finance', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_stocks': 'Yahoo Stocks', 'yahoo_finance_crypto': 'Yahoo Crypto',
-            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_economy': 'Yahoo Economy',
-            'yahoo_finance_business': 'Yahoo Business', 'yahoo_finance_markets': 'Yahoo Markets',
-            'yahoo_finance_energy': 'Yahoo Energy', 'yahoo_finance_healthcare': 'Yahoo Healthcare',
-            'yahoo_finance_finance_sector': 'Yahoo Financial', 'yahoo_finance_consumer': 'Yahoo Consumer',
-            'yahoo_finance_alt1': 'Yahoo TopStories', 'yahoo_finance_alt2': 'Yahoo MostViewed'
+            'yahoo_finance_main': 'Yahoo Finance RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
+            'yahoo_finance_direct': 'Yahoo Direct Scraping', 'yahoo_finance_latest': 'Yahoo Latest News',
+            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
+            'yahoo_finance_economy_news': 'Yahoo Economy'
         }
+        
+        # Handle scraped sources
+        if news['source'] not in source_names and 'yahoo_finance_scraped' in news['source']:
+            source_names[news['source']] = 'Yahoo Finance Scraped'
         
         source_name = source_names.get(news['source'], news['source'])
         
         await loading_msg.delete()
         
-        # Determine if translated
-        is_translated = "[Đã dịch từ" in full_content if full_content else False
+        # Determine extraction method used
+        is_gemini_extracted = "[🤖 Gemini đã trích xuất" in full_content if full_content else False
+        extraction_method = "🤖 Gemini AI" if is_gemini_extracted else "🔧 Traditional Methods"
         
         # Create content with metadata
-        title_suffix = " 🌐 (Gemini dịch)" if is_translated else ""
-        main_title = f"📖 Chi tiết bài viết Enhanced{title_suffix}"
+        main_title = f"📖 Chi tiết bài viết - {extraction_method}"
         
         # Enhanced metadata
         content_with_meta = f"**📰 Tiêu đề:** {news['title']}\n"
         content_with_meta += f"**🕰️ Thời gian:** {news['published_str']} ({get_current_date_str()})\n"
-        content_with_meta += f"**📰 Nguồn:** {source_name}{'🌐' if is_translated else ''}\n"
+        content_with_meta += f"**📰 Nguồn:** {source_name}\n"
+        content_with_meta += f"**🔧 Extraction Method:** {extraction_method}\n"
         
-        if is_translated:
-            content_with_meta += f"**🤖 Gemini Translation:** Đã dịch tự động từ tiếng Anh\n"
+        if is_gemini_extracted:
+            content_with_meta += f"**🌐 Gemini Translation:** Đã trích xuất và dịch tự động\n"
         
-        content_with_meta += f"**🔄 System:** Enhanced deduplication active\n\n"
-        content_with_meta += f"**📄 Nội dung chi tiết:**\n{full_content}"
+        content_with_meta += f"\n**📄 Nội dung chi tiết:**\n{full_content}"
         
         # Create optimized embeds
         optimized_embeds = create_optimized_embeds(main_title, content_with_meta, 0x9932cc)
@@ -1351,7 +1426,7 @@ async def get_news_detail_enhanced(ctx, news_number: int):
             )
             optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
             
-            optimized_embeds[-1].set_footer(text=f"📖 Enhanced Content System • Tin số {news_number} • {len(optimized_embeds)} phần")
+            optimized_embeds[-1].set_footer(text=f"🤖 Gemini-Powered Content System • Tin số {news_number} • {len(optimized_embeds)} phần")
         
         # Send all embeds
         for i, embed in enumerate(optimized_embeds, 1):
@@ -1399,11 +1474,11 @@ async def enhanced_gemini_question(ctx, *, question):
                 
                 if article_content:
                     context = f"BÀI BÁO LIÊN QUAN:\nTiêu đề: {article['title']}\nNguồn: {article['source']}\nNội dung: {article_content[:1500]}"
-                    context_info = f"📰 **Context:** Bài báo #{user_id} vừa xem (Enhanced)"
+                    context_info = f"📰 **Context:** Bài báo vừa xem với Gemini-Powered extraction"
         
         progress_embed = create_safe_embed(
-            "💎 Gemini AI Enhanced System",
-            f"**Câu hỏi:** {question}\n{context_info}\n🧠 **Đang phân tích với Enhanced AI...**",
+            "💎 Gemini AI Powered System",
+            f"**Câu hỏi:** {question}\n{context_info}\n🧠 **Đang phân tích với Gemini AI...**",
             0x9932cc
         )
         
@@ -1413,25 +1488,25 @@ async def enhanced_gemini_question(ctx, *, question):
         if context:
             # Article analysis mode
             analysis_result = await gemini_engine.analyze_article(context, question)
-            strategy_text = "Article Analysis Enhanced"
+            strategy_text = "Gemini Article Analysis"
         else:
             # General question mode
             analysis_result = await gemini_engine.ask_question(question, context)
-            strategy_text = "General Knowledge Enhanced"
+            strategy_text = "Gemini Knowledge Base"
         
         # Create optimized embeds
-        title = f"💎 Gemini Analysis Enhanced - {strategy_text}"
+        title = f"💎 Gemini Analysis - {strategy_text}"
         optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
         
         # Add metadata to first embed
         if optimized_embeds:
             safe_name, safe_value = validate_embed_field(
-                "🔍 Analysis Mode Enhanced",
-                f"**Strategy:** {strategy_text}\n**Context:** {'Article-based' if context else 'Knowledge-based'}\n**Model:** Gemini-2.0-Flash-Exp\n**System:** Enhanced deduplication active"
+                "🔍 Gemini Analysis Mode",
+                f"**Strategy:** {strategy_text}\n**Context:** {'Article-based' if context else 'Knowledge-based'}\n**Model:** Gemini-2.0-Flash-Exp\n**System:** Gemini-Powered Content Extraction"
             )
             optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
             
-            optimized_embeds[-1].set_footer(text=f"💎 Gemini AI Enhanced • {current_datetime_str}")
+            optimized_embeds[-1].set_footer(text=f"💎 Gemini AI Powered • {current_datetime_str}")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1440,11 +1515,11 @@ async def enhanced_gemini_question(ctx, *, question):
             await ctx.send(embed=embed)
         
     except Exception as e:
-        await ctx.send(f"❌ Lỗi hệ thống Gemini Enhanced: {str(e)}")
+        await ctx.send(f"❌ Lỗi hệ thống Gemini: {str(e)}")
 
 @bot.command(name='debate')
 async def gemini_debate_system(ctx, *, topic=""):
-    """Multi-perspective debate system với Gemini Enhanced"""
+    """Multi-perspective debate system với Gemini"""
     try:
         if not gemini_engine.available:
             embed = create_safe_embed(
@@ -1474,8 +1549,8 @@ async def gemini_debate_system(ctx, *, topic=""):
                 return
         
         progress_embed = create_safe_embed(
-            "🎭 Gemini Debate Enhanced System",
-            f"**Chủ đề:** {topic}\n🎪 **Đang tổ chức tranh luận Enhanced với 6 thân phận có đạo đức khác nhau...**",
+            "🎭 Gemini Debate Powered System",
+            f"**Chủ đề:** {topic}\n🎪 **Đang tổ chức tranh luận với 6 thân phận có đạo đức khác nhau...**",
             0xff9900
         )
         
@@ -1485,18 +1560,18 @@ async def gemini_debate_system(ctx, *, topic=""):
         debate_result = await gemini_engine.debate_perspectives(topic)
         
         # Create optimized embeds
-        title = f"🎭 Multi-Perspective Debate Enhanced"
+        title = f"🎭 Multi-Perspective Debate Powered"
         optimized_embeds = create_optimized_embeds(title, debate_result, 0xff6600)
         
         # Add metadata to first embed
         if optimized_embeds:
             safe_name, safe_value = validate_embed_field(
-                "🎪 Debate Info Enhanced",
-                f"**Topic:** {topic[:80]}...\n**Characters:** 6 thân phận với đặc điểm đạo đức riêng biệt\n**AI Engine:** Gemini Multi-Role Advanced Enhanced\n**System:** Enhanced moral diversity"
+                "🎪 Gemini Debate Info",
+                f"**Topic:** {topic[:80]}...\n**Characters:** 6 thân phận với đặc điểm đạo đức riêng biệt\n**AI Engine:** Gemini Multi-Role Advanced\n**System:** Gemini-Powered moral diversity analysis"
             )
             optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
             
-            optimized_embeds[-1].set_footer(text=f"🎭 Gemini Debate Enhanced • {get_current_datetime_str()}")
+            optimized_embeds[-1].set_footer(text=f"🎭 Gemini Debate Powered • {get_current_datetime_str()}")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1505,65 +1580,64 @@ async def gemini_debate_system(ctx, *, topic=""):
             await ctx.send(embed=embed)
         
     except Exception as e:
-        await ctx.send(f"❌ Lỗi hệ thống debate Enhanced: {str(e)}")
+        await ctx.send(f"❌ Lỗi hệ thống debate: {str(e)}")
 
 @bot.command(name='menu')
 async def help_command_optimized(ctx):
-    """Enhanced menu guide với thống kê chi tiết"""
+    """Gemini-Powered menu guide với thống kê chi tiết"""
     current_datetime_str = get_current_datetime_str()
     
     main_embed = create_safe_embed(
-        "🤖 Enhanced News Bot - Yahoo Finance Optimized",
-        f"CafeF + Enhanced Yahoo Finance với Gemini AI - {current_datetime_str}",
+        "🤖 Gemini-Powered News Bot - Yahoo Finance Enhanced",
+        f"CafeF + Gemini-Enhanced Yahoo Finance với Direct Content Extraction - {current_datetime_str}",
         0xff9900
     )
     
     ai_status = f"🤖 **Gemini AI {'✅ Ready' if gemini_engine.available else '❌ Unavailable'}**"
-    dedup_status = f"🔄 **Deduplication System: ✅ Active**"
+    extraction_status = f"🔧 **Content Extraction: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}**"
     
-    safe_name, safe_value = validate_embed_field("🤖 Enhanced AI Status", f"{ai_status}\n{dedup_status}")
+    safe_name, safe_value = validate_embed_field("🤖 Gemini-Powered Status", f"{ai_status}\n{extraction_status}")
     main_embed.add_field(name=safe_name, value=safe_value, inline=False)
     
     safe_name2, safe_value2 = validate_embed_field(
-        "🤖 AI Commands Enhanced",
-        f"**!hoi [câu hỏi]** - Gemini AI trả lời với enhanced context\n**!hoi [question]** - Tự động hiểu context sau !chitiet\n**!debate [chủ đề]** - Enhanced tranh luận 6 thân phận có đặc điểm đạo đức khác nhau"
+        "🤖 AI Commands Powered",
+        f"**!hoi [câu hỏi]** - Gemini AI với context awareness\n**!hoi [question]** - Tự động hiểu context từ !chitiet\n**!debate [chủ đề]** - Gemini tranh luận 6 thân phận có đạo đức khác nhau"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
     
     safe_name3, safe_value3 = validate_embed_field(
         "📰 News Commands Enhanced",
-        f"**!all [trang]** - CafeF + Enhanced Yahoo Finance (nhiều nguồn, dedup)\n**!in [trang]** - CafeF Vietnam\n**!out [trang]** - Enhanced Yahoo Finance (nhiều categories, Gemini dịch)\n**!chitiet [số]** - Chi tiết bài viết với enhanced extraction"
+        f"**!all [trang]** - CafeF + Yahoo Finance (RSS + Scraping)\n**!in [trang]** - CafeF Vietnam (Traditional extraction)\n**!out [trang]** - Yahoo Finance (Gemini-powered extraction)\n**!chitiet [số]** - Chi tiết: 🤖 Gemini (nước ngoài) + 🔧 Traditional (trong nước)"
     )
     main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
     
     safe_name4, safe_value4 = validate_embed_field(
-        "🎯 Examples Enhanced",
-        f"**!hoi lạm phát Việt Nam** - Gemini phân tích enhanced\n**!chitiet 1** - Xem chi tiết tin 1 với enhanced system\n**!hoi tại sao?** - AI phân tích bài vừa xem với context\n**!debate lãi suất** - Enhanced 6 nhân vật với đạo đức khác nhau tranh luận"
+        "🎯 Examples Powered",
+        f"**!out** - Xem tin Yahoo Finance với Gemini extraction\n**!chitiet 1** - Gemini trích xuất nội dung nước ngoài\n**!hoi tại sao?** - Gemini phân tích bài vừa xem\n**!debate bitcoin** - Gemini tổ chức tranh luận"
     )
     main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-    yahoo_categories = len(RSS_FEEDS['international'])
     safe_name5, safe_value5 = validate_embed_field(
-        "📊 Enhanced Sources", 
-        f"🇻🇳 **CafeF**: {len(RSS_FEEDS['domestic'])} RSS feeds\n🌍 **Yahoo Finance**: {yahoo_categories} enhanced RSS feeds\n📊 **Tổng**: {total_sources} nguồn chọn lọc\n🔄 **Deduplication**: Hash-based + Similarity check\n⚡ **Retry**: 3-level retry mechanism"
+        "📊 Gemini-Enhanced Sources", 
+        f"🇻🇳 **CafeF**: {len(RSS_FEEDS['domestic'])} RSS feeds (Traditional extraction)\n🌍 **Yahoo Finance**: {len(RSS_FEEDS['international'])} sources (RSS + Direct scraping)\n🤖 **Gemini Content**: Direct link access + translation\n📊 **Tổng**: {total_sources} nguồn với dual extraction methods"
     )
     main_embed.add_field(name=safe_name5, value=safe_value5, inline=True)
     
-    # Add enhanced features
+    # Add Gemini features
     safe_name6, safe_value6 = validate_embed_field(
-        "🚀 Enhanced Features",
-        f"✅ **Multi-category RSS**: Stocks, Crypto, Tech, Economy, Healthcare\n✅ **Smart Deduplication**: Hash + Title similarity + URL comparison\n✅ **Retry Mechanism**: 3-level retry với anti-blocking\n✅ **Enhanced Translation**: Gemini AI auto-translate\n✅ **Context Awareness**: AI hiểu context từ !chitiet"
+        "🚀 Gemini-Powered Features",
+        f"✅ **Gemini Content Extraction**: Trực tiếp truy cập link bài báo\n✅ **Smart Translation**: Gemini tự động dịch tiếng Anh → Việt\n✅ **Dual Extraction**: Gemini (nước ngoài) + Traditional (trong nước)\n✅ **RSS + Scraping**: Multiple Yahoo Finance sources\n✅ **Context Awareness**: Gemini hiểu context từ !chitiet"
     )
     main_embed.add_field(name=safe_name6, value=safe_value6, inline=True)
     
-    main_embed.set_footer(text=f"🤖 Enhanced News Bot - Yahoo Finance Optimized • {current_datetime_str}")
+    main_embed.set_footer(text=f"🤖 Gemini-Powered News Bot • {current_datetime_str}")
     await ctx.send(embed=main_embed)
 
 # 🆕 STATUS COMMAND
 @bot.command(name='status')
 async def status_command(ctx):
-    """Hiển thị trạng thái hệ thống Enhanced"""
+    """Hiển thị trạng thái hệ thống Gemini-Powered"""
     current_datetime_str = get_current_datetime_str()
     
     # System statistics
@@ -1572,45 +1646,41 @@ async def status_command(ctx):
     user_cache_size = len(user_news_cache)
     
     main_embed = create_safe_embed(
-        "📊 Enhanced System Status",
+        "📊 Gemini-Powered System Status",
         f"Trạng thái hệ thống lúc {current_datetime_str}",
         0x00ff88
     )
     
     # RSS Sources Status
     safe_name1, safe_value1 = validate_embed_field(
-        "📰 RSS Sources Enhanced",
-        f"🇻🇳 **CafeF Sources**: {len(RSS_FEEDS['domestic'])}\n🌍 **Yahoo Finance Sources**: {len(RSS_FEEDS['international'])}\n📊 **Total Active Sources**: {total_sources}\n⚡ **Retry Mechanism**: 3-level active"
+        "📰 News Sources Enhanced",
+        f"🇻🇳 **CafeF Sources**: {len(RSS_FEEDS['domestic'])} RSS feeds\n🌍 **Yahoo Finance Sources**: {len(RSS_FEEDS['international'])} (RSS + Direct scraping)\n📊 **Total Active Sources**: {total_sources}\n🔧 **Methods**: RSS parsing + Direct HTML scraping"
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
-    # Deduplication Status
+    # Gemini Status
+    gemini_status = "✅ Ready" if gemini_engine.available else "❌ Unavailable"
     safe_name2, safe_value2 = validate_embed_field(
-        "🔄 Deduplication System",
-        f"📦 **Global Cache**: {global_cache_size}/{MAX_GLOBAL_CACHE} articles\n👥 **User Cache**: {user_cache_size}/{MAX_CACHE_ENTRIES} users\n✅ **Hash-based**: Active\n✅ **Similarity Check**: Active\n✅ **URL Comparison**: Active"
+        "🤖 Gemini AI System",
+        f"🧠 **Gemini AI**: {gemini_status}\n🔧 **Content Extraction**: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}\n🌐 **Auto Translation**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}\n📊 **Context Awareness**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=True)
     
-    # AI System Status
-    ai_status = "✅ Ready" if gemini_engine.available else "❌ Unavailable"
+    # Deduplication Status
     safe_name3, safe_value3 = validate_embed_field(
-        "🤖 AI System Enhanced",
-        f"🧠 **Gemini AI**: {ai_status}\n🌐 **Auto Translation**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}\n📊 **Context Awareness**: ✅ Active\n🎭 **Debate System**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}"
+        "🔄 Enhanced Systems",
+        f"📦 **Global Cache**: {global_cache_size}/{MAX_GLOBAL_CACHE} articles\n👥 **User Cache**: {user_cache_size}/{MAX_CACHE_ENTRIES} users\n✅ **Deduplication**: Hash + Similarity + URL comparison\n🚀 **Performance**: Multi-source scraping optimized"
     )
     main_embed.add_field(name=safe_name3, value=safe_value3, inline=True)
     
-    # Yahoo Finance Categories
-    yahoo_categories = [
-        "Headlines", "Stocks", "Crypto", "Tech", "Economy", 
-        "Business", "Markets", "Energy", "Healthcare", "Financial", "Consumer"
-    ]
+    # Yahoo Finance Methods
     safe_name4, safe_value4 = validate_embed_field(
-        "🌍 Yahoo Finance Categories",
-        f"📋 **Available Categories**: {len(yahoo_categories)}\n📊 **Categories**: " + ", ".join(yahoo_categories[:8]) + f"\n🔗 **Enhanced URLs**: ✅ Working\n🚀 **Performance**: Optimized"
+        "🌍 Yahoo Finance Enhanced Methods",
+        f"📋 **RSS Feeds**: Working Yahoo Finance RSS endpoints\n🔍 **Direct Scraping**: finance.yahoo.com/news/ + topic pages\n🤖 **Gemini Extraction**: Direct link access for full content\n🚀 **Performance**: Multiple fallback methods for reliability"
     )
     main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
     
-    main_embed.set_footer(text=f"📊 Enhanced System Status • Updated: {current_datetime_str}")
+    main_embed.set_footer(text=f"📊 Gemini-Powered System Status • Updated: {current_datetime_str}")
     await ctx.send(embed=main_embed)
 
 # Run the bot
@@ -1619,12 +1689,13 @@ if __name__ == "__main__":
         keep_alive()
         print("🌐 Keep-alive server started")
         
-        print("🚀 Starting Enhanced Yahoo Finance News Bot...")
-        print(f"🔧 CafeF Sources: {len(RSS_FEEDS['domestic'])}")
-        print(f"🔧 Enhanced Yahoo Finance Sources: {len(RSS_FEEDS['international'])}")
+        print("🚀 Starting Gemini-Powered Yahoo Finance News Bot...")
+        print(f"🔧 CafeF Sources: {len(RSS_FEEDS['domestic'])} (Traditional extraction)")
+        print(f"🔧 Yahoo Finance Sources: {len(RSS_FEEDS['international'])} (RSS + Direct scraping)")
         print(f"🤖 Gemini AI: {'✅ Ready' if gemini_engine.available else '❌ Not Available'}")
+        print(f"🔧 Content Extraction: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}")
         print(f"🔄 Deduplication System: ✅ Active")
-        print(f"⚡ Enhanced Features: Multi-retry, Smart filtering, Context awareness")
+        print(f"⚡ Enhanced Features: RSS + Scraping, Gemini extraction, Context awareness")
         print(f"⚡ Boot time: {get_current_datetime_str()}")
         print("=" * 80)
         
