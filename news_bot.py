@@ -469,22 +469,24 @@ def is_relevant_financial_news_relaxed(title):
     title_lower = title.lower()
     return any(keyword in title_lower for keyword in financial_keywords)
 
-# 🚀 ENHANCED CONTENT EXTRACTION - CafeF uses traditional, Yahoo Finance uses Gemini
+# 🚀 ENHANCED CONTENT EXTRACTION - USE GEMINI FOR ALL INTERNATIONAL SOURCES
 async def extract_content_enhanced(url, source_name, news_item=None):
-    """Enhanced content extraction - Gemini for international, traditional for domestic"""
+    """Enhanced content extraction - Gemini for ALL international sources"""
     
-    # For international (Yahoo Finance) sources, use Gemini
+    # For ALL international sources, use Gemini (not just Yahoo Finance)
     if is_international_source(source_name):
+        print(f"🤖 Using Gemini for international source: {source_name}")
         return await extract_content_with_gemini(url, source_name)
     
     # For domestic (CafeF) sources, use traditional methods
     try:
+        print(f"🔧 Using traditional methods for domestic source: {source_name}")
         add_random_delay()
         session = requests.Session()
         headers = get_enhanced_headers(url)
         session.headers.update(headers)
         
-        response = session.get(url, timeout=15, allow_redirects=True)  # Reduced timeout
+        response = session.get(url, timeout=15, allow_redirects=True)
         
         if response.status_code == 200:
             # Method 1: Trafilatura
@@ -504,7 +506,7 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         session.close()
                         return content.strip()
                 except Exception as e:
-                    pass
+                    print(f"⚠️ Trafilatura failed: {e}")
             
             # Method 2: Newspaper3k
             if NEWSPAPER_AVAILABLE:
@@ -523,7 +525,7 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         return article.text.strip()
                 
                 except Exception as e:
-                    pass
+                    print(f"⚠️ Newspaper3k failed: {e}")
             
             # Method 3: BeautifulSoup for CafeF
             if BEAUTIFULSOUP_AVAILABLE:
@@ -560,12 +562,14 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         return content.strip()
                         
                 except Exception as e:
-                    pass
+                    print(f"⚠️ BeautifulSoup failed: {e}")
         
         session.close()
-        return create_fallback_content(url, source_name)
+        print(f"⚠️ All traditional methods failed for {source_name}")
+        return create_fallback_content(url, source_name, "Traditional extraction methods failed")
         
     except Exception as e:
+        print(f"❌ Extract content error for {source_name}: {e}")
         return create_fallback_content(url, source_name, str(e))
 
 # 🆕 GEMINI CONTENT EXTRACTION FOR INTERNATIONAL NEWS
@@ -575,22 +579,25 @@ async def extract_content_with_gemini(url, source_name):
         if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
             return create_fallback_content(url, source_name, "Gemini không khả dụng")
         
-        extraction_prompt = f"""Bạn là chuyên gia trích xuất và dịch thuật tin tức tài chính. Hãy truy cập link bài báo sau và thực hiện:
+        extraction_prompt = f"""You are a financial news content extractor and translator. Access and process this news article:
 
-**LINK BÀI BÁO:** {url}
+**ARTICLE URL:** {url}
 
-**YÊU CẦU:**
-1. Truy cập và đọc TOÀN BỘ nội dung bài báo từ link
-2. Trích xuất nội dung chính (bỏ quảng cáo, sidebar, footer)
-3. Dịch từ tiếng Anh sang tiếng Việt một cách tự nhiên và chính xác
-4. Giữ nguyên các con số, phần trăm, tên công ty, thuật ngữ tài chính
-5. Sử dụng thuật ngữ kinh tế-tài chính tiếng Việt chuẩn
-6. KHÔNG thêm giải thích hay bình luận cá nhân
-7. Trả về nội dung đã dịch với cấu trúc rõ ràng
+**INSTRUCTIONS:**
+1. Access and read the COMPLETE article content from the URL
+2. Extract main content (remove ads, sidebar, footer)
+3. Translate from English to Vietnamese naturally and accurately
+4. Preserve all numbers, percentages, company names, financial terms
+5. Use standard Vietnamese economic-financial terminology
+6. Do NOT add personal commentary or explanations
+7. Return translated content with clear structure
+8. FOCUS ONLY on the source article content - do not reference other news sources
 
-**GHI CHÚ:** Chỉ trả về nội dung bài báo đã được dịch, không cần giải thích quá trình.
+**IMPORTANT:** Only return the translated article content from the provided URL. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
 
-**NỘI DUNG ĐÃ DỊCH:**"""
+**TRANSLATED CONTENT:**"""
+        
+        try:
 
         try:
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
@@ -652,29 +659,52 @@ def clean_content_enhanced(content):
     return content.strip()
 
 def is_international_source(source_name):
-    """Check if source is international (Yahoo Finance)"""
-    return 'yahoo_finance' in source_name
+    """Check if source is international - FIXED for all RSS sources"""
+    international_sources = [
+        'yahoo_finance', 'cnn_money', 'reuters', 'marketwatch', 'business_insider',
+        'forbes', 'wsj', 'cnbc', 'investing_com', 'seekingalpha', 'financial_times',
+        'fortune', 'economist', 'nasdaq', 'washington_post', 'guardian_business',
+        'investopedia', 'nikkei_asia', 'economic_times', 'bbc_news', 'coindesk'
+    ]
+    return any(source in source_name for source in international_sources)
 
 def create_fallback_content(url, source_name, error_msg=""):
-    """Create fallback content when extraction fails"""
+    """Create fallback content when extraction fails - FIXED for all sources"""
     try:
         article_id = url.split('/')[-1] if '/' in url else 'news-article'
         
         if is_international_source(source_name):
-            return f"""**Yahoo Finance News Analysis:**
+            # Get actual source display name
+            source_display = "Financial News"
+            if 'marketwatch' in source_name:
+                source_display = "MarketWatch"
+            elif 'reuters' in source_name:
+                source_display = "Reuters"
+            elif 'cnn' in source_name:
+                source_display = "CNN Money"
+            elif 'forbes' in source_name:
+                source_display = "Forbes"
+            elif 'wsj' in source_name:
+                source_display = "Wall Street Journal"
+            elif 'cnbc' in source_name:
+                source_display = "CNBC"
+            elif 'bbc' in source_name:
+                source_display = "BBC News"
+            
+            return f"""**{source_display} Financial News:**
 
-📈 **Financial Market Insights:** This article provides financial market analysis and economic insights from Yahoo Finance.
+📈 **Market Analysis:** This article provides financial market insights and economic analysis.
 
-📊 **Market Coverage:**
-• Real-time stock market data and analysis
-• Economic indicators and market trends
-• Corporate earnings and financial reports
+📊 **Coverage Areas:**
+• Real-time market data and analysis
+• Economic indicators and trends
+• Corporate earnings and reports
 • Investment strategies and forecasts
 
 **Article ID:** {article_id}
-**Note:** For complete article, please visit the original link.
+**Note:** Content extraction failed. Please visit the original link for complete article.
 
-{f'**Error:** {error_msg}' if error_msg else ''}"""
+{f'**Technical Error:** {error_msg}' if error_msg else ''}"""
         else:
             return f"""**Tin tức kinh tế CafeF:**
 
@@ -1022,24 +1052,27 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
         try:
             analysis_question = question if question else "Hãy phân tích và tóm tắt bài báo này"
             
-            prompt = f"""Bạn là Gemini AI - chuyên gia phân tích tài chính thông minh. Hãy phân tích bài báo dựa trên TOÀN BỘ nội dung được cung cấp.
+            prompt = f"""You are Gemini AI - an intelligent financial economics expert. Analyze the article based on the COMPLETE content provided.
 
-**TOÀN BỘ NỘI DUNG BÀI BÁO:**
+**COMPLETE ARTICLE CONTENT:**
 {article_content}
 
-**YÊU CẦU PHÂN TÍCH:**
+**ANALYSIS REQUEST:**
 {analysis_question}
 
-**HƯỚNG DẪN PHÂN TÍCH:**
-1. Dựa CHÍNH vào nội dung bài báo (85-90%)
-2. Kết hợp kiến thức chuyên môn để giải thích sâu hơn (10-15%)
-3. Phân tích tác động, nguyên nhân, hậu quả
-4. Đưa ra insights và nhận định chuyên sâu
-5. Trả lời trực tiếp câu hỏi với evidence từ bài báo
-6. Độ dài: 600-1000 từ với cấu trúc rõ ràng
-7. Tham chiếu cụ thể đến các phần trong bài
+**ANALYSIS GUIDELINES:**
+1. Base analysis PRIMARILY on the article content (85-90%)
+2. Combine with professional knowledge for deeper explanation (10-15%)
+3. Analyze impact, causes, consequences
+4. Provide insights and in-depth assessments
+5. Answer questions directly with evidence from the article
+6. Length: 600-1000 words with clear structure
+7. Reference specific parts of the article
+8. ONLY analyze the provided article - do not reference other news sources unless mentioned in the original
 
-Hãy đưa ra phân tích THÔNG MINH và CHI TIẾT:"""
+**IMPORTANT:** Focus solely on the content from the provided article. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
+
+Provide INTELLIGENT and DETAILED analysis:"""
 
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
             
@@ -1449,11 +1482,11 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         
         # Determine extraction method based on source
         if is_international_source(news['source']):
-            loading_msg = await ctx.send(f"⏳ Đang tải bằng Gemini AI...")
+            loading_msg = await ctx.send(f"⏳ Đang tải bằng Gemini AI cho {news['source']}...")
         else:
             loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        # Enhanced content extraction
+        # Enhanced content extraction - NOW USES GEMINI FOR ALL INTERNATIONAL
         full_content = await extract_content_enhanced(news['link'], news['source'], news)
         
         # Enhanced source names
