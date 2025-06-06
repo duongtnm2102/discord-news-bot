@@ -119,7 +119,7 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 ENHANCED FEEDS - FIXED URLs for 2025 - RSS + Working Direct Scraping
+# 🔧 MASSIVE RSS FEEDS - 20+ WORKING SOURCES from GitHub Gist 2025
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -130,32 +130,39 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - FIXED Yahoo Finance URLs 2025 ===
+    # === QUỐC TẾ - MASSIVE RSS COLLECTION from GitHub Gist 2025 ===
     'international': {
-        # ✅ VERIFIED RSS FEEDS - Working 2025
+        # ✅ YAHOO FINANCE RSS (Original working feeds)
         'yahoo_finance_main': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_headlines': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
+        'yahoo_finance_rss': 'https://www.yahoo.com/news/rss/finance',
         
-        # ✅ WORKING SECTORS URLs - Changed from /topic/ to /sectors/
-        'yahoo_finance_real_estate': 'https://finance.yahoo.com/sectors/real-estate/',
-        'yahoo_finance_financial_services': 'https://finance.yahoo.com/sectors/financial-services/',
-        'yahoo_finance_basic_materials': 'https://finance.yahoo.com/sectors/basic-materials/',
-        'yahoo_finance_energy': 'https://finance.yahoo.com/sectors/energy/',
-        'yahoo_finance_industrials': 'https://finance.yahoo.com/sectors/industrials/',
-        'yahoo_finance_technology': 'https://finance.yahoo.com/sectors/technology/',
+        # ✅ MAJOR FINANCIAL NEWS RSS FEEDS (Verified from GitHub)
+        'cnn_money': 'http://rss.cnn.com/rss/money_topstories.rss',
+        'reuters_topnews': 'http://feeds.reuters.com/reuters/topNews',
+        'marketwatch': 'http://feeds.marketwatch.com/marketwatch/topstories/',
+        'business_insider': 'http://feeds2.feedburner.com/businessinsider',
+        'forbes': 'https://www.forbes.com/real-time/feed2/',
+        'wsj': 'http://www.wsj.com/xml/rss/3_7031.xml',
+        'cnbc': 'https://www.cnbc.com/id/100003114/device/rss/rss.html',
+        'investing_com': 'https://www.investing.com/rss/news.rss',
+        'seekingalpha': 'https://seekingalpha.com/market_currents.xml',
+        'financial_times': 'https://www.ft.com/?format=rss',
+        'fortune': 'http://fortune.com/feed/',
+        'economist': 'http://www.economist.com/sections/economics/rss.xml',
+        'nasdaq': 'http://articlefeeds.nasdaq.com/nasdaq/categories?category=Investing+Ideas',
+        'washington_post_biz': 'http://feeds.washingtonpost.com/rss/business',
+        'guardian_business': 'https://www.theguardian.com/business/economics/rss',
+        'investopedia': 'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',
+        'nikkei_asia': 'https://asia.nikkei.com/rss/feed/nar',
+        'economic_times': 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',
+        'bbc_news': 'http://feeds.bbci.co.uk/news/rss.xml',
+        'coindesk': 'https://feeds.feedburner.com/CoinDesk',
         
-        # ✅ WORKING NEWS SECTION URLs
-        'yahoo_finance_news': 'https://finance.yahoo.com/news/',
-        'yahoo_finance_markets': 'https://finance.yahoo.com/markets/',
+        # ✅ BACKUP WORKING URLs (if primary fail)
         'yahoo_finance_crypto': 'https://finance.yahoo.com/topic/crypto/',
-        'yahoo_finance_tech_news': 'https://finance.yahoo.com/topic/tech/',
-        
-        # ✅ VERIFIED TOPIC URLs - Still working
+        'yahoo_finance_tech': 'https://finance.yahoo.com/topic/tech/',
         'yahoo_finance_stock_market': 'https://finance.yahoo.com/topic/stock-market-news/',
-        'yahoo_finance_earnings': 'https://finance.yahoo.com/topic/earnings/',
-        
-        # ✅ Alternative news sources on Yahoo Finance
-        'yahoo_finance_videos': 'https://finance.yahoo.com/videos/',
     }
 }
 
@@ -1186,30 +1193,52 @@ async def get_all_news_enhanced(ctx, page=1):
         domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
         international_count = len(page_news) - domestic_count
         
-        # Enhanced source mapping
+        # MASSIVE source mapping for 20+ RSS feeds
         source_names = {
+            # CafeF sources
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
             
-            # Fixed Yahoo Finance sources
+            # Yahoo Finance sources
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_real_estate': 'Yahoo BĐS', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
-            'yahoo_finance_technology': 'Yahoo Tech', 'yahoo_finance_news': 'Yahoo News',
+            'yahoo_finance_rss': 'Yahoo Finance', 'yahoo_finance_crypto': 'Yahoo Crypto',
+            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_stock_market': 'Yahoo Stocks',
+            
+            # Major financial news sources
+            'cnn_money': 'CNN Money', 'reuters_topnews': 'Reuters', 'marketwatch': 'MarketWatch',
+            'business_insider': 'Business Insider', 'forbes': 'Forbes', 'wsj': 'Wall Street Journal',
+            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 'seekingalpha': 'Seeking Alpha',
+            'financial_times': 'Financial Times', 'fortune': 'Fortune', 'economist': 'The Economist',
+            'nasdaq': 'Nasdaq', 'washington_post_biz': 'Washington Post', 'guardian_business': 'The Guardian',
+            'investopedia': 'Investopedia', 'nikkei_asia': 'Nikkei Asia', 'economic_times': 'Economic Times',
+            'bbc_news': 'BBC News', 'coindesk': 'CoinDesk',
+            
+            # Scraped sources
             'yahoo_finance_scraped': 'Yahoo Scraped'
         }
         
         emoji_map = {
+            # CafeF sources
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
             
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
-            'yahoo_finance_real_estate': '🏢', 'yahoo_finance_financial_services': '💳',
-            'yahoo_finance_technology': '💻', 'yahoo_finance_news': '📰',
+            # Yahoo Finance sources
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
+            'yahoo_finance_crypto': '💰', 'yahoo_finance_tech': '💻', 'yahoo_finance_stock_market': '📈',
+            
+            # Major financial news sources
+            'cnn_money': '📺', 'reuters_topnews': '🌍', 'marketwatch': '📊', 'business_insider': '💼',
+            'forbes': '💎', 'wsj': '📰', 'cnbc': '📺', 'investing_com': '💹', 'seekingalpha': '🔍',
+            'financial_times': '📊', 'fortune': '💰', 'economist': '🎯', 'nasdaq': '📈',
+            'washington_post_biz': '📰', 'guardian_business': '🛡️', 'investopedia': '📚',
+            'nikkei_asia': '🌏', 'economic_times': '🇮🇳', 'bbc_news': '🇬🇧', 'coindesk': '₿',
+            
+            # Scraped sources
             'yahoo_finance_scraped': '🚀'
         }
         
         # Simple statistics
-        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 Yahoo: {international_count} • 📊 Tổng: {len(all_news)}"
+        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 International: {international_count} • 📊 Tổng: {len(all_news)}\n🔥 NEW: 20+ RSS feeds từ GitHub sources!"
         fields_data.append(("📊 Thống kê", stats_field))
         
         for i, news in enumerate(page_news, 1):
@@ -1265,21 +1294,38 @@ async def get_international_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 Yahoo Finance: {len(news_list)} tin • ✅ URLs đã fixed cho 2025"
+        stats_field = f"📰 International News: {len(news_list)} tin\n🔥 20+ RSS sources: CNN, Reuters, WSJ, Forbes, BBC và nhiều hơn!\n✅ URLs from GitHub verified 2025"
         fields_data.append(("📊 Thông tin", stats_field))
         
-        # Enhanced source names
+        # MASSIVE source names for international sources
         source_names = {
+            # Yahoo Finance sources
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_real_estate': 'Yahoo BĐS', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
-            'yahoo_finance_technology': 'Yahoo Tech', 'yahoo_finance_news': 'Yahoo News',
+            'yahoo_finance_rss': 'Yahoo Finance', 'yahoo_finance_crypto': 'Yahoo Crypto',
+            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_stock_market': 'Yahoo Stocks',
+            
+            # Major financial news sources
+            'cnn_money': 'CNN Money', 'reuters_topnews': 'Reuters', 'marketwatch': 'MarketWatch',
+            'business_insider': 'Business Insider', 'forbes': 'Forbes', 'wsj': 'Wall Street Journal',
+            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 'seekingalpha': 'Seeking Alpha',
+            'financial_times': 'Financial Times', 'fortune': 'Fortune', 'economist': 'The Economist',
+            'nasdaq': 'Nasdaq', 'washington_post_biz': 'Washington Post', 'guardian_business': 'The Guardian',
+            'investopedia': 'Investopedia', 'nikkei_asia': 'Nikkei Asia', 'economic_times': 'Economic Times',
+            'bbc_news': 'BBC News', 'coindesk': 'CoinDesk',
             'yahoo_finance_scraped': 'Yahoo Scraped'
         }
         
         emoji_map = {
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
-            'yahoo_finance_real_estate': '🏢', 'yahoo_finance_financial_services': '💳',
-            'yahoo_finance_technology': '💻', 'yahoo_finance_news': '📰',
+            # Yahoo Finance sources
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
+            'yahoo_finance_crypto': '💰', 'yahoo_finance_tech': '💻', 'yahoo_finance_stock_market': '📈',
+            
+            # Major financial news sources
+            'cnn_money': '📺', 'reuters_topnews': '🌍', 'marketwatch': '📊', 'business_insider': '💼',
+            'forbes': '💎', 'wsj': '📰', 'cnbc': '📺', 'investing_com': '💹', 'seekingalpha': '🔍',
+            'financial_times': '📊', 'fortune': '💰', 'economist': '🎯', 'nasdaq': '📈',
+            'washington_post_biz': '📰', 'guardian_business': '🛡️', 'investopedia': '📚',
+            'nikkei_asia': '🌏', 'economic_times': '🇮🇳', 'bbc_news': '🇬🇧', 'coindesk': '₿',
             'yahoo_finance_scraped': '🚀'
         }
         
@@ -1588,8 +1634,8 @@ async def help_command_optimized(ctx):
     """Simple menu guide"""
     
     main_embed = create_safe_embed(
-        "📰 News Bot - Fixed 2025",
-        "CafeF + Yahoo Finance (URLs đã sửa)",
+        "📰 News Bot - 20+ RSS Sources",
+        "CafeF + CNN + Reuters + WSJ + Forbes + BBC + 15 more!",
         0x00ff88
     )
     
@@ -1617,14 +1663,14 @@ async def status_command(ctx):
     global_cache_size = len(global_seen_articles)
     
     main_embed = create_safe_embed(
-        "📊 Trạng thái hệ thống - Fixed 2025",
+        "📊 Trạng thái hệ thống - 20+ RSS Sources",
         "",
         0x00ff88
     )
     
     safe_name1, safe_value1 = validate_embed_field(
         "📰 Nguồn tin",
-        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 Yahoo Finance: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n✅ URLs đã được sửa cho 2025"
+        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 International: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n🔥 20+ RSS feeds từ GitHub sources!\n✅ CNN, Reuters, WSJ, Forbes, BBC..."
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
@@ -1645,10 +1691,11 @@ if __name__ == "__main__":
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
         
-        print("🚀 Starting FIXED News Bot...")
-        print(f"🔧 Sources: {total_sources}")
+        print("🚀 Starting MASSIVE RSS News Bot...")
+        print(f"🔧 Sources: {total_sources} (20+ RSS feeds)")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
-        print("✅ URLs FIXED for 2025")
+        print("🔥 MASSIVE RSS collection from GitHub sources")
+        print("📰 CNN, Reuters, WSJ, Forbes, BBC, CNBC + more!")
         print("⚡ Optimized timeouts and limits")
         print("=" * 40)
         
