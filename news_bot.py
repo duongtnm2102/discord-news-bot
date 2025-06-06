@@ -110,17 +110,16 @@ def get_current_datetime_str():
     current_dt = get_current_vietnam_datetime()
     return current_dt.strftime("%H:%M %d/%m/%Y")
 
-print("🚀 GEMINI-POWERED YAHOO FINANCE BOT:")
-print(f"DISCORD_TOKEN: {'✅ Found' if TOKEN else '❌ Missing'}")
-print(f"GEMINI_API_KEY: {'✅ Found' if GEMINI_API_KEY else '❌ Missing'}")
-print(f"🔧 Current Vietnam time: {get_current_datetime_str()}")
-print("=" * 50)
+print("🚀 NEWS BOT:")
+print(f"DISCORD_TOKEN: {'✅' if TOKEN else '❌'}")
+print(f"GEMINI_API_KEY: {'✅' if GEMINI_API_KEY else '❌'}")
+print("=" * 30)
 
 if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 ENHANCED FEEDS - RSS + Direct Scraping
+# 🔧 ENHANCED FEEDS - RSS + Direct Scraping với focus vào vĩ mô, bất động sản, tài chính, kinh tế
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -131,18 +130,37 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - Enhanced Yahoo Finance RSS + Direct Scraping ===
+    # === QUỐC TẾ - Yahoo Finance RSS + Direct Scraping - Focus VĨ MÔ, BĐS, TÀI CHÍNH, KINH TẾ ===
     'international': {
         # Working RSS Feeds
         'yahoo_finance_main': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_headlines': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         
-        # Direct Scraping Sources
-        'yahoo_finance_direct': 'https://finance.yahoo.com/news/',
-        'yahoo_finance_latest': 'https://finance.yahoo.com/topic/latest-news/',
-        'yahoo_finance_markets': 'https://finance.yahoo.com/topic/stock-market-news/',
-        'yahoo_finance_crypto_news': 'https://finance.yahoo.com/topic/crypto/',
-        'yahoo_finance_economy_news': 'https://finance.yahoo.com/topic/economic-news/'
+        # Topic-specific Direct Scraping - VĨ MÔ & KINH TẾ
+        'yahoo_finance_economic_news': 'https://finance.yahoo.com/topic/economic-news/',
+        'yahoo_finance_economy': 'https://finance.yahoo.com/topic/economy/',
+        'yahoo_finance_federal_reserve': 'https://finance.yahoo.com/topic/federal-reserve/',
+        'yahoo_finance_inflation': 'https://finance.yahoo.com/topic/inflation/',
+        'yahoo_finance_interest_rates': 'https://finance.yahoo.com/topic/interest-rates/',
+        
+        # BẤT ĐỘNG SẢN & NHÀ Ở
+        'yahoo_finance_housing': 'https://finance.yahoo.com/topic/housing/',
+        'yahoo_finance_real_estate': 'https://finance.yahoo.com/sectors/real-estate/',
+        'yahoo_finance_mortgage': 'https://finance.yahoo.com/topic/mortgage/',
+        
+        # TÀI CHÍNH & NGÂN HÀNG
+        'yahoo_finance_banking': 'https://finance.yahoo.com/topic/banking/',
+        'yahoo_finance_financial_services': 'https://finance.yahoo.com/sectors/financial-services/',
+        'yahoo_finance_consumer_finance': 'https://finance.yahoo.com/topic/consumer-finance/',
+        
+        # VĨ MÔ KHÁC
+        'yahoo_finance_gdp': 'https://finance.yahoo.com/topic/gdp/',
+        'yahoo_finance_employment': 'https://finance.yahoo.com/topic/employment/',
+        'yahoo_finance_consumer_spending': 'https://finance.yahoo.com/topic/consumer-spending/',
+        'yahoo_finance_trade_policy': 'https://finance.yahoo.com/topic/trade-policy/',
+        
+        # General Finance News
+        'yahoo_finance_general': 'https://finance.yahoo.com/news/'
     }
 }
 
@@ -644,9 +662,9 @@ def create_fallback_content(url, source_name, error_msg=""):
     except Exception as e:
         return f"Nội dung từ {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ."
 
-# 🚀 ENHANCED NEWS COLLECTION WITH RSS + SCRAPING
-async def collect_news_enhanced(sources_dict, limit_per_source=25):
-    """Enhanced news collection with RSS feeds + direct scraping"""
+# 🚀 ENHANCED NEWS COLLECTION WITH RSS + SCRAPING - INCREASED LIMITS
+async def collect_news_enhanced(sources_dict, limit_per_source=50):
+    """Enhanced news collection with RSS feeds + direct scraping - Increased limits for more pages"""
     all_news = []
     
     for source_name, source_url in sources_dict.items():
@@ -1088,7 +1106,7 @@ async def on_ready():
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     
-    status_text = f"Gemini-Powered Yahoo Finance • {total_sources} sources • !menu"
+    status_text = f"News Bot • {total_sources} sources"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -1097,10 +1115,8 @@ async def on_ready():
     )
     
     print(f"🤖 Gemini AI: {ai_status}")
-    print(f"📊 News Sources: {total_sources} (CafeF: {len(RSS_FEEDS['domestic'])}, Yahoo Finance: {len(RSS_FEEDS['international'])})")
-    print(f"🔄 Deduplication: Active")
-    print(f"🤖 Gemini Content Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}")
-    print(f"🕰️ Started at: {current_datetime_str}")
+    print(f"📊 Sources: {total_sources}")
+    print(f"🕰️ Started: {current_datetime_str}")
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -1120,10 +1136,10 @@ async def get_all_news_enhanced(ctx, page=1):
     """Tin tức từ CafeF và Yahoo Finance với Gemini-powered extraction"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn (RSS + Direct scraping)...")
+        loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 25)
-        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 30)
+        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 30)
+        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 50)
         
         await loading_msg.delete()
         
@@ -1145,22 +1161,53 @@ async def get_all_news_enhanced(ctx, page=1):
         domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
         international_count = len(page_news) - domestic_count
         
-        # Enhanced source mapping
+        # Enhanced source mapping - VĨ MÔ, BẤT ĐỘNG SẢN, TÀI CHÍNH, KINH TẾ
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
+            
+            # Yahoo Finance RSS
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_direct': 'Yahoo Direct', 'yahoo_finance_latest': 'Yahoo Latest',
-            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
-            'yahoo_finance_economy_news': 'Yahoo Economy'
+            
+            # VĨ MÔ & KINH TẾ
+            'yahoo_finance_economic_news': 'Yahoo Kinh tế', 'yahoo_finance_economy': 'Yahoo Vĩ mô',
+            'yahoo_finance_federal_reserve': 'Yahoo Fed', 'yahoo_finance_inflation': 'Yahoo Lạm phát',
+            'yahoo_finance_interest_rates': 'Yahoo Lãi suất', 'yahoo_finance_gdp': 'Yahoo GDP',
+            'yahoo_finance_employment': 'Yahoo Việc làm', 'yahoo_finance_consumer_spending': 'Yahoo Tiêu dùng',
+            'yahoo_finance_trade_policy': 'Yahoo Thương mại',
+            
+            # BẤT ĐỘNG SẢN
+            'yahoo_finance_housing': 'Yahoo Nhà ở', 'yahoo_finance_real_estate': 'Yahoo BĐS',
+            'yahoo_finance_mortgage': 'Yahoo Thế chấp',
+            
+            # TÀI CHÍNH & NGÂN HÀNG  
+            'yahoo_finance_banking': 'Yahoo Ngân hàng', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
+            'yahoo_finance_consumer_finance': 'Yahoo TC Tiêu dùng',
+            
+            # General
+            'yahoo_finance_general': 'Yahoo Tổng hợp'
         }
         
         emoji_map = {
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_direct': '🔍',
-            'yahoo_finance_latest': '🆕', 'yahoo_finance_markets': '📊', 'yahoo_finance_crypto_news': '₿',
-            'yahoo_finance_economy_news': '🌍'
+            
+            # Yahoo Finance RSS
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
+            
+            # VĨ MÔ & KINH TẾ
+            'yahoo_finance_economic_news': '🌍', 'yahoo_finance_economy': '📊', 'yahoo_finance_federal_reserve': '🏛️',
+            'yahoo_finance_inflation': '📈', 'yahoo_finance_interest_rates': '💹', 'yahoo_finance_gdp': '📊',
+            'yahoo_finance_employment': '👥', 'yahoo_finance_consumer_spending': '🛒', 'yahoo_finance_trade_policy': '🌐',
+            
+            # BẤT ĐỘNG SẢN
+            'yahoo_finance_housing': '🏠', 'yahoo_finance_real_estate': '🏢', 'yahoo_finance_mortgage': '🏦',
+            
+            # TÀI CHÍNH & NGÂN HÀNG
+            'yahoo_finance_banking': '🏦', 'yahoo_finance_financial_services': '💳', 'yahoo_finance_consumer_finance': '💰',
+            
+            # General
+            'yahoo_finance_general': '📰'
         }
         
         # Fallback for scraped sources
@@ -1170,9 +1217,9 @@ async def get_all_news_enhanced(ctx, page=1):
                     source_names[news['source']] = 'Yahoo Scraped'
                     emoji_map[news['source']] = '🚀'
         
-        # Add enhanced statistics
-        stats_field = f"🇻🇳 CafeF: {domestic_count} tin\n🌍 Yahoo Finance: {international_count} tin\n📊 Tổng có sẵn: {len(all_news)} tin\n🤖 Gemini Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}"
-        fields_data.append(("📊 Thống kê Gemini-Powered", stats_field))
+        # Simple statistics
+        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 Yahoo: {international_count} • 📊 Tổng: {len(all_news)}"
+        fields_data.append(("📊 Thống kê", stats_field))
         
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '📰')
@@ -1186,7 +1233,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"📰 Tin tức tổng hợp Gemini-Powered (Trang {page})",
+            f"📰 Tin tức (Trang {page})",
             "",
             fields_data,
             0x00ff88
@@ -1196,7 +1243,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"🤖 Gemini-Powered Bot • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số]")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1209,9 +1256,9 @@ async def get_international_news_enhanced(ctx, page=1):
     """Tin tức quốc tế - Gemini-Powered Yahoo Finance với RSS + Direct Scraping"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức từ {len(RSS_FEEDS['international'])} nguồn Yahoo Finance (RSS + Scraping + Gemini)...")
+        loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 30)
+        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 50)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1231,21 +1278,50 @@ async def get_international_news_enhanced(ctx, page=1):
         rss_count = sum(1 for news in page_news if 'scraped' not in news['source'])
         scraped_count = len(page_news) - rss_count
         
-        stats_field = f"📰 Tổng tin Yahoo Finance: {len(news_list)} tin\n🤖 Gemini Content Extraction: {'✅ Active' if gemini_engine.available else '❌ Inactive'}\n📊 RSS: {rss_count} tin • 🔍 Scraped: {scraped_count} tin\n🌐 Auto-translate: Gemini AI"
-        fields_data.append(("📊 Thông tin Gemini-Powered", stats_field))
+        stats_field = f"📰 Yahoo Finance: {len(news_list)} tin"
+        fields_data.append(("📊 Thông tin", stats_field))
         
-        # Enhanced source names
+        # Enhanced source names - VĨ MÔ, BẤT ĐỘNG SẢN, TÀI CHÍNH, KINH TẾ
         source_names = {
+            # Yahoo Finance RSS
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_direct': 'Yahoo Direct', 'yahoo_finance_latest': 'Yahoo Latest',
-            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
-            'yahoo_finance_economy_news': 'Yahoo Economy'
+            
+            # VĨ MÔ & KINH TẾ
+            'yahoo_finance_economic_news': 'Yahoo Kinh tế', 'yahoo_finance_economy': 'Yahoo Vĩ mô',
+            'yahoo_finance_federal_reserve': 'Yahoo Fed', 'yahoo_finance_inflation': 'Yahoo Lạm phát',
+            'yahoo_finance_interest_rates': 'Yahoo Lãi suất', 'yahoo_finance_gdp': 'Yahoo GDP',
+            'yahoo_finance_employment': 'Yahoo Việc làm', 'yahoo_finance_consumer_spending': 'Yahoo Tiêu dùng',
+            'yahoo_finance_trade_policy': 'Yahoo Thương mại',
+            
+            # BẤT ĐỘNG SẢN
+            'yahoo_finance_housing': 'Yahoo Nhà ở', 'yahoo_finance_real_estate': 'Yahoo BĐS',
+            'yahoo_finance_mortgage': 'Yahoo Thế chấp',
+            
+            # TÀI CHÍNH & NGÂN HÀNG  
+            'yahoo_finance_banking': 'Yahoo Ngân hàng', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
+            'yahoo_finance_consumer_finance': 'Yahoo TC Tiêu dùng',
+            
+            # General
+            'yahoo_finance_general': 'Yahoo Tổng hợp'
         }
         
         emoji_map = {
-            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_direct': '🔍',
-            'yahoo_finance_latest': '🆕', 'yahoo_finance_markets': '📊', 'yahoo_finance_crypto_news': '₿',
-            'yahoo_finance_economy_news': '🌍'
+            # Yahoo Finance RSS
+            'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
+            
+            # VĨ MÔ & KINH TẾ
+            'yahoo_finance_economic_news': '🌍', 'yahoo_finance_economy': '📊', 'yahoo_finance_federal_reserve': '🏛️',
+            'yahoo_finance_inflation': '📈', 'yahoo_finance_interest_rates': '💹', 'yahoo_finance_gdp': '📊',
+            'yahoo_finance_employment': '👥', 'yahoo_finance_consumer_spending': '🛒', 'yahoo_finance_trade_policy': '🌐',
+            
+            # BẤT ĐỘNG SẢN
+            'yahoo_finance_housing': '🏠', 'yahoo_finance_real_estate': '🏢', 'yahoo_finance_mortgage': '🏦',
+            
+            # TÀI CHÍNH & NGÂN HÀNG
+            'yahoo_finance_banking': '🏦', 'yahoo_finance_financial_services': '💳', 'yahoo_finance_consumer_finance': '💰',
+            
+            # General
+            'yahoo_finance_general': '📰'
         }
         
         # Handle scraped sources
@@ -1267,7 +1343,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🌍 Tin kinh tế quốc tế Gemini-Powered (Trang {page})",
+            f"🌍 Tin nước ngoài (Trang {page})",
             "",
             fields_data,
             0x0066ff
@@ -1277,7 +1353,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"🤖 Gemini-Powered Yahoo Finance • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số]")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1290,9 +1366,9 @@ async def get_domestic_news_enhanced(ctx, page=1):
     """Tin tức trong nước - CafeF với traditional extraction"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin tức CafeF...")
+        loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 25)
+        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 30)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1333,7 +1409,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🇻🇳 Tin kinh tế CafeF (Trang {page})",
+            f"🇻🇳 Tin trong nước (Trang {page})",
             "",
             fields_data,
             0xff0000
@@ -1343,7 +1419,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"CafeF Vietnam • Trang {page}/{total_pages} • !chitiet [số] • Phần {i+1}/{len(embeds)}")
+            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số]")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1375,9 +1451,9 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         
         # Determine extraction method based on source
         if is_international_source(news['source']):
-            loading_msg = await ctx.send(f"🤖 Đang trích xuất nội dung với Gemini AI...")
+            loading_msg = await ctx.send(f"⏳ Đang tải...")
         else:
-            loading_msg = await ctx.send(f"🔧 Đang trích xuất nội dung với traditional methods...")
+            loading_msg = await ctx.send(f"⏳ Đang tải...")
         
         # Enhanced content extraction
         full_content = await extract_content_enhanced(news['link'], news['source'], news)
@@ -1405,18 +1481,12 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         extraction_method = "🤖 Gemini AI" if is_gemini_extracted else "🔧 Traditional Methods"
         
         # Create content with metadata
-        main_title = f"📖 Chi tiết bài viết - {extraction_method}"
+        main_title = f"📖 Chi tiết tin {news_number}"
         
-        # Enhanced metadata
-        content_with_meta = f"**📰 Tiêu đề:** {news['title']}\n"
-        content_with_meta += f"**🕰️ Thời gian:** {news['published_str']} ({get_current_date_str()})\n"
-        content_with_meta += f"**📰 Nguồn:** {source_name}\n"
-        content_with_meta += f"**🔧 Extraction Method:** {extraction_method}\n"
-        
-        if is_gemini_extracted:
-            content_with_meta += f"**🌐 Gemini Translation:** Đã trích xuất và dịch tự động\n"
-        
-        content_with_meta += f"\n**📄 Nội dung chi tiết:**\n{full_content}"
+        # Simple metadata
+        content_with_meta = f"**📰 {news['title']}**\n"
+        content_with_meta += f"**🕰️ {news['published_str']}** • **📰 {source_name}**\n\n"
+        content_with_meta += f"{full_content}"
         
         # Create optimized embeds
         optimized_embeds = create_optimized_embeds(main_title, content_with_meta, 0x9932cc)
@@ -1424,12 +1494,12 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Add link to last embed
         if optimized_embeds:
             safe_name, safe_value = validate_embed_field(
-                "🔗 Đọc bài viết gốc",
-                f"[Nhấn để đọc bài viết gốc]({news['link']})"
+                "🔗 Link gốc",
+                f"[Đọc bài viết gốc]({news['link']})"
             )
             optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
             
-            optimized_embeds[-1].set_footer(text=f"🤖 Gemini-Powered Content System • Tin số {news_number} • {len(optimized_embeds)} phần")
+            optimized_embeds[-1].set_footer(text=f"Tin số {news_number}")
         
         # Send all embeds
         for i, embed in enumerate(optimized_embeds, 1):
@@ -1480,8 +1550,8 @@ async def enhanced_gemini_question(ctx, *, question):
                     context_info = f"📰 **Context:** Bài báo vừa xem với Gemini-Powered extraction"
         
         progress_embed = create_safe_embed(
-            "💎 Gemini AI Powered System",
-            f"**Câu hỏi:** {question}\n{context_info}\n🧠 **Đang phân tích với Gemini AI...**",
+            "🤖 Gemini AI",
+            f"Đang phân tích: {question[:100]}...",
             0x9932cc
         )
         
@@ -1498,18 +1568,12 @@ async def enhanced_gemini_question(ctx, *, question):
             strategy_text = "Gemini Knowledge Base"
         
         # Create optimized embeds
-        title = f"💎 Gemini Analysis - {strategy_text}"
+        title = f"🤖 Gemini AI"
         optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
         
-        # Add metadata to first embed
+        # Simple footer
         if optimized_embeds:
-            safe_name, safe_value = validate_embed_field(
-                "🔍 Gemini Analysis Mode",
-                f"**Strategy:** {strategy_text}\n**Context:** {'Article-based' if context else 'Knowledge-based'}\n**Model:** Gemini-2.0-Flash-Exp\n**System:** Gemini-Powered Content Extraction"
-            )
-            optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
-            
-            optimized_embeds[-1].set_footer(text=f"💎 Gemini AI Powered • {current_datetime_str}")
+            optimized_embeds[-1].set_footer(text=f"Gemini AI")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1552,8 +1616,8 @@ async def gemini_debate_system(ctx, *, topic=""):
                 return
         
         progress_embed = create_safe_embed(
-            "🎭 Gemini Debate Powered System",
-            f"**Chủ đề:** {topic}\n🎪 **Đang tổ chức tranh luận với 6 thân phận có đạo đức khác nhau...**",
+            "🎭 Gemini Debate",
+            f"Chủ đề: {topic[:100]}...",
             0xff9900
         )
         
@@ -1563,18 +1627,12 @@ async def gemini_debate_system(ctx, *, topic=""):
         debate_result = await gemini_engine.debate_perspectives(topic)
         
         # Create optimized embeds
-        title = f"🎭 Multi-Perspective Debate Powered"
+        title = f"🎭 Debate"
         optimized_embeds = create_optimized_embeds(title, debate_result, 0xff6600)
         
-        # Add metadata to first embed
+        # Simple footer
         if optimized_embeds:
-            safe_name, safe_value = validate_embed_field(
-                "🎪 Gemini Debate Info",
-                f"**Topic:** {topic[:80]}...\n**Characters:** 6 thân phận với đặc điểm đạo đức riêng biệt\n**AI Engine:** Gemini Multi-Role Advanced\n**System:** Gemini-Powered moral diversity analysis"
-            )
-            optimized_embeds[0].add_field(name=safe_name, value=safe_value, inline=True)
-            
-            optimized_embeds[-1].set_footer(text=f"🎭 Gemini Debate Powered • {get_current_datetime_str()}")
+            optimized_embeds[-1].set_footer(text=f"Gemini Debate")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1587,103 +1645,56 @@ async def gemini_debate_system(ctx, *, topic=""):
 
 @bot.command(name='menu')
 async def help_command_optimized(ctx):
-    """Gemini-Powered menu guide với thống kê chi tiết"""
-    current_datetime_str = get_current_datetime_str()
+    """Simple menu guide"""
     
     main_embed = create_safe_embed(
-        "🤖 Gemini-Powered News Bot - Yahoo Finance Enhanced",
-        f"CafeF + Gemini-Enhanced Yahoo Finance với Direct Content Extraction - {current_datetime_str}",
-        0xff9900
+        "📰 News Bot",
+        "CafeF + Yahoo Finance",
+        0x00ff88
     )
     
-    ai_status = f"🤖 **Gemini AI {'✅ Ready' if gemini_engine.available else '❌ Unavailable'}**"
-    extraction_status = f"🔧 **Content Extraction: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}**"
-    
-    safe_name, safe_value = validate_embed_field("🤖 Gemini-Powered Status", f"{ai_status}\n{extraction_status}")
-    main_embed.add_field(name=safe_name, value=safe_value, inline=False)
+    safe_name1, safe_value1 = validate_embed_field(
+        "📰 Lệnh tin tức",
+        "**!all [trang]** - Tất cả tin tức\n**!in [trang]** - Tin trong nước\n**!out [trang]** - Tin nước ngoài\n**!chitiet [số]** - Chi tiết bài viết"
+    )
+    main_embed.add_field(name=safe_name1, value=safe_value1, inline=False)
     
     safe_name2, safe_value2 = validate_embed_field(
-        "🤖 AI Commands Powered",
-        f"**!hoi [câu hỏi]** - Gemini AI với context awareness\n**!hoi [question]** - Tự động hiểu context từ !chitiet\n**!debate [chủ đề]** - Gemini tranh luận 6 thân phận có đạo đức khác nhau"
+        "🤖 Lệnh AI",
+        "**!hoi [câu hỏi]** - Hỏi AI\n**!debate [chủ đề]** - Tranh luận"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
     
-    safe_name3, safe_value3 = validate_embed_field(
-        "📰 News Commands Enhanced",
-        f"**!all [trang]** - CafeF + Yahoo Finance (RSS + Scraping)\n**!in [trang]** - CafeF Vietnam (Traditional extraction)\n**!out [trang]** - Yahoo Finance (Gemini-powered extraction)\n**!chitiet [số]** - Chi tiết: 🤖 Gemini (nước ngoài) + 🔧 Traditional (trong nước)"
-    )
-    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
-    
-    safe_name4, safe_value4 = validate_embed_field(
-        "🎯 Examples Powered",
-        f"**!out** - Xem tin Yahoo Finance với Gemini extraction\n**!chitiet 1** - Gemini trích xuất nội dung nước ngoài\n**!hoi tại sao?** - Gemini phân tích bài vừa xem\n**!debate bitcoin** - Gemini tổ chức tranh luận"
-    )
-    main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
-    
-    total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-    safe_name5, safe_value5 = validate_embed_field(
-        "📊 Gemini-Enhanced Sources", 
-        f"🇻🇳 **CafeF**: {len(RSS_FEEDS['domestic'])} RSS feeds (Traditional extraction)\n🌍 **Yahoo Finance**: {len(RSS_FEEDS['international'])} sources (RSS + Direct scraping)\n🤖 **Gemini Content**: Direct link access + translation\n📊 **Tổng**: {total_sources} nguồn với dual extraction methods"
-    )
-    main_embed.add_field(name=safe_name5, value=safe_value5, inline=True)
-    
-    # Add Gemini features
-    safe_name6, safe_value6 = validate_embed_field(
-        "🚀 Gemini-Powered Features",
-        f"✅ **Gemini Content Extraction**: Trực tiếp truy cập link bài báo\n✅ **Smart Translation**: Gemini tự động dịch tiếng Anh → Việt\n✅ **Dual Extraction**: Gemini (nước ngoài) + Traditional (trong nước)\n✅ **RSS + Scraping**: Multiple Yahoo Finance sources\n✅ **Context Awareness**: Gemini hiểu context từ !chitiet"
-    )
-    main_embed.add_field(name=safe_name6, value=safe_value6, inline=True)
-    
-    main_embed.set_footer(text=f"🤖 Gemini-Powered News Bot • {current_datetime_str}")
     await ctx.send(embed=main_embed)
 
 # 🆕 STATUS COMMAND
 @bot.command(name='status')
 async def status_command(ctx):
-    """Hiển thị trạng thái hệ thống Gemini-Powered"""
-    current_datetime_str = get_current_datetime_str()
+    """Hiển thị trạng thái hệ thống"""
     
     # System statistics
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     global_cache_size = len(global_seen_articles)
-    user_cache_size = len(user_news_cache)
     
     main_embed = create_safe_embed(
-        "📊 Gemini-Powered System Status",
-        f"Trạng thái hệ thống lúc {current_datetime_str}",
+        "📊 Trạng thái hệ thống",
+        "",
         0x00ff88
     )
     
-    # RSS Sources Status
     safe_name1, safe_value1 = validate_embed_field(
-        "📰 News Sources Enhanced",
-        f"🇻🇳 **CafeF Sources**: {len(RSS_FEEDS['domestic'])} RSS feeds\n🌍 **Yahoo Finance Sources**: {len(RSS_FEEDS['international'])} (RSS + Direct scraping)\n📊 **Total Active Sources**: {total_sources}\n🔧 **Methods**: RSS parsing + Direct HTML scraping"
+        "📰 Nguồn tin",
+        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 Yahoo Finance: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}"
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
-    # Gemini Status
-    gemini_status = "✅ Ready" if gemini_engine.available else "❌ Unavailable"
+    gemini_status = "✅" if gemini_engine.available else "❌"
     safe_name2, safe_value2 = validate_embed_field(
-        "🤖 Gemini AI System",
-        f"🧠 **Gemini AI**: {gemini_status}\n🔧 **Content Extraction**: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}\n🌐 **Auto Translation**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}\n📊 **Context Awareness**: {'✅ Active' if gemini_engine.available else '❌ Inactive'}"
+        "🤖 AI System",
+        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=True)
     
-    # Deduplication Status
-    safe_name3, safe_value3 = validate_embed_field(
-        "🔄 Enhanced Systems",
-        f"📦 **Global Cache**: {global_cache_size}/{MAX_GLOBAL_CACHE} articles\n👥 **User Cache**: {user_cache_size}/{MAX_CACHE_ENTRIES} users\n✅ **Deduplication**: Hash + Similarity + URL comparison\n🚀 **Performance**: Multi-source scraping optimized"
-    )
-    main_embed.add_field(name=safe_name3, value=safe_value3, inline=True)
-    
-    # Yahoo Finance Methods
-    safe_name4, safe_value4 = validate_embed_field(
-        "🌍 Yahoo Finance Enhanced Methods",
-        f"📋 **RSS Feeds**: Working Yahoo Finance RSS endpoints\n🔍 **Direct Scraping**: finance.yahoo.com/news/ + topic pages\n🤖 **Gemini Extraction**: Direct link access for full content\n🚀 **Performance**: Multiple fallback methods for reliability"
-    )
-    main_embed.add_field(name=safe_name4, value=safe_value4, inline=False)
-    
-    main_embed.set_footer(text=f"📊 Gemini-Powered System Status • Updated: {current_datetime_str}")
     await ctx.send(embed=main_embed)
 
 # Run the bot
@@ -1692,18 +1703,12 @@ if __name__ == "__main__":
         keep_alive()
         print("🌐 Keep-alive server started")
         
-        print("🚀 Starting Gemini-Powered Yahoo Finance News Bot...")
-        print(f"🔧 CafeF Sources: {len(RSS_FEEDS['domestic'])} (Traditional extraction)")
-        print(f"🔧 Yahoo Finance Sources: {len(RSS_FEEDS['international'])} (RSS + Direct scraping)")
-        print(f"🤖 Gemini AI: {'✅ Ready' if gemini_engine.available else '❌ Not Available'}")
-        print(f"🔧 Content Extraction: {'🤖 Gemini (International) + 🔧 Traditional (Domestic)' if gemini_engine.available else '🔧 Traditional Only'}")
-        print(f"🔄 Deduplication System: ✅ Active")
-        print(f"⚡ Enhanced Features: RSS + Scraping, Gemini extraction, Context awareness")
-        print(f"⚡ Boot time: {get_current_datetime_str()}")
-        print("=" * 80)
+        print("🚀 Starting News Bot...")
+        print(f"🔧 Sources: {total_sources}")
+        print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
+        print("=" * 40)
         
         bot.run(TOKEN)
         
     except Exception as e:
         print(f"❌ STARTUP ERROR: {e}")
-        print("🔧 Check environment variables and dependencies")
