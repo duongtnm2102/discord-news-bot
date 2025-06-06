@@ -99,10 +99,10 @@ def get_current_datetime_str():
     current_dt = get_current_vietnam_datetime()
     return current_dt.strftime("%H:%M %d/%m/%Y")
 
-print("🚀 ENHANCED NEWS BOT:")
-print(f"DISCORD_TOKEN: {'✅' if TOKEN else '❌'}")
-print(f"GEMINI_API_KEY: {'✅' if GEMINI_API_KEY else '❌'}")
-print("=" * 30)
+print("🚀 News Bot:")
+print(f"Token: {'✅' if TOKEN else '❌'}")
+print(f"Gemini: {'✅' if GEMINI_API_KEY else '❌'}")
+print("=" * 20)
 
 if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
@@ -344,27 +344,17 @@ async def extract_content_with_gemini(url, source_name):
         if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
             return create_fallback_content(url, source_name, "Gemini không khả dụng")
         
-        extraction_prompt = f"""You are a financial news content extractor and translator. Please read and analyze this news article:
+        extraction_prompt = f"""Truy cập và trích xuất TOÀN BỘ nội dung bài báo từ: {url}
 
-**ARTICLE URL:** {url}
+YÊU CẦU:
+1. Đọc và hiểu HOÀN TOÀN bài báo
+2. Trích xuất TẤT CẢ nội dung chính (loại bỏ quảng cáo, sidebar)
+3. Dịch từ tiếng Anh sang tiếng Việt TỰ NHIÊN
+4. Giữ nguyên số liệu, tên công ty, thuật ngữ tài chính
+5. Độ dài: 500-1500 từ (toàn bộ bài viết)
+6. CHỈ trả về nội dung bài báo đã dịch
 
-**INSTRUCTIONS:**
-1. Read and understand the complete article content
-2. Extract the main news information and key facts
-3. Translate the content from English to Vietnamese naturally
-4. Preserve all numbers, percentages, company names, financial terms
-5. Use standard Vietnamese economic-financial terminology
-6. Return ONLY the translated article content
-7. Focus on factual reporting, avoid speculation
-
-**IMPORTANT REQUIREMENTS:**
-- Only translate the actual article content
-- Do not add commentary or personal opinions
-- Keep all financial data and company names accurate
-- Use proper Vietnamese grammar and structure
-- Length: 300-800 words depending on original content
-
-**TRANSLATED CONTENT:**"""
+**NỘI DUNG HOÀN CHỈNH:**"""
 
         try:
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
@@ -372,7 +362,7 @@ async def extract_content_with_gemini(url, source_name):
             generation_config = genai.types.GenerationConfig(
                 temperature=0.1,
                 top_p=0.8,
-                max_output_tokens=2000,
+                max_output_tokens=3000,  # Tăng từ 2000 để lấy toàn bộ nội dung
             )
             
             response = await asyncio.wait_for(
@@ -381,23 +371,23 @@ async def extract_content_with_gemini(url, source_name):
                     extraction_prompt,
                     generation_config=generation_config
                 ),
-                timeout=20
+                timeout=30  # Tăng timeout từ 20s
             )
             
             extracted_content = response.text.strip()
             
-            if len(extracted_content) > 200:
+            if len(extracted_content) > 300:
                 error_indicators = [
                     'cannot access', 'unable to access', 'không thể truy cập',
                     'failed to retrieve', 'error occurred', 'sorry, i cannot'
                 ]
                 
                 if not any(indicator in extracted_content.lower() for indicator in error_indicators):
-                    return f"[🤖 Gemini AI trích xuất từ {source_name}]\n\n{extracted_content}"
+                    return f"[🤖 Gemini AI - Toàn bộ nội dung từ {source_name}]\n\n{extracted_content}"
                 else:
-                    return create_fallback_content(url, source_name, "Gemini không thể trích xuất nội dung")
+                    return create_fallback_content(url, source_name, "Gemini không thể trích xuất")
             else:
-                return create_fallback_content(url, source_name, "Gemini trả về nội dung quá ngắn")
+                return create_fallback_content(url, source_name, "Nội dung quá ngắn")
             
         except asyncio.TimeoutError:
             return create_fallback_content(url, source_name, "Gemini timeout")
@@ -444,7 +434,7 @@ async def extract_content_enhanced(url, source_name, news_item=None):
         content = await fetch_with_aiohttp(url)
         
         if content:
-            # Method 1: Trafilatura with async execution
+            # Method 1: Trafilatura with enhanced config for full content
             if TRAFILATURA_AVAILABLE:
                 try:
                     result = await asyncio.to_thread(
@@ -453,29 +443,53 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         include_comments=False,
                         include_tables=True,
                         include_links=False,
-                        favor_precision=True,
-                        with_metadata=True
+                        include_images=False,
+                        favor_precision=False,  # Changed to False for more content
+                        favor_recall=True,      # Added for maximum content
+                        with_metadata=True,
+                        prune_xpath=[],         # Don't prune anything
+                        only_with_metadata=False
                     )
                     
-                    if result and result.get('text') and len(result['text']) > 300:
-                        return result['text'].strip()
+                    if result and result.get('text') and len(result['text']) > 200:
+                        full_text = result['text']
+                        
+                        # Try to get more content with different settings
+                        if len(full_text) < 1000:
+                            result2 = await asyncio.to_thread(
+                                trafilatura.extract,
+                                content,
+                                include_comments=True,
+                                include_tables=True,
+                                include_links=True,
+                                favor_precision=False,
+                                favor_recall=True
+                            )
+                            if result2 and len(result2) > len(full_text):
+                                full_text = result2
+                        
+                        return full_text.strip()
                 except Exception as e:
                     print(f"⚠️ Trafilatura failed: {e}")
             
-            # Method 2: BeautifulSoup with async execution
+            # Method 2: Enhanced BeautifulSoup with multiple strategies
             if BEAUTIFULSOUP_AVAILABLE:
                 try:
                     soup = await asyncio.to_thread(BeautifulSoup, content, 'html.parser')
                     
+                    # Strategy 1: CafeF specific selectors
                     content_selectors = [
                         'div.detail-content',
-                        'div.fck_detail',
+                        'div.fck_detail', 
                         'div.content-detail',
                         'div.article-content',
                         'div.entry-content',
                         'div.post-content',
                         'article',
-                        'main'
+                        'main',
+                        '.article-body',
+                        '.content-body',
+                        '.post-body'
                     ]
                     
                     extracted_text = ""
@@ -484,18 +498,47 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         if elements:
                             for element in elements:
                                 text = element.get_text(strip=True)
-                                if len(text) > 500:
+                                if len(text) > len(extracted_text):
                                     extracted_text = text
-                                    break
-                            if extracted_text:
-                                break
                     
-                    if extracted_text and len(extracted_text) > 500:
+                    # Strategy 2: Find all paragraphs and combine
+                    if len(extracted_text) < 500:
+                        all_paragraphs = soup.find_all('p')
+                        paragraph_texts = []
+                        for p in all_paragraphs:
+                            p_text = p.get_text(strip=True)
+                            if len(p_text) > 50:  # Only substantial paragraphs
+                                paragraph_texts.append(p_text)
+                        
+                        combined_text = '\n\n'.join(paragraph_texts)
+                        if len(combined_text) > len(extracted_text):
+                            extracted_text = combined_text
+                    
+                    if extracted_text and len(extracted_text) > 300:
                         cleaned_content = clean_content_enhanced(extracted_text)
                         return cleaned_content.strip()
                         
                 except Exception as e:
                     print(f"⚠️ BeautifulSoup failed: {e}")
+            
+            # Method 3: Newspaper3k fallback
+            if NEWSPAPER_AVAILABLE:
+                try:
+                    from newspaper import Article
+                    article = Article(url)
+                    article.set_config({
+                        'headers': get_enhanced_headers(url),
+                        'timeout': 12
+                    })
+                    
+                    article.download()
+                    article.parse()
+                    
+                    if article.text and len(article.text) > 300:
+                        return article.text.strip()
+                
+                except Exception as e:
+                    print(f"⚠️ Newspaper3k failed: {e}")
         
         print(f"⚠️ All traditional methods failed for {source_name}")
         return create_fallback_content(url, source_name, "Traditional extraction methods failed")
@@ -892,7 +935,7 @@ async def on_ready():
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     
-    status_text = f"News Bot • {total_sources} FREE sources"
+    status_text = f"News • {total_sources} sources"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -900,9 +943,8 @@ async def on_ready():
         )
     )
     
-    print(f"🤖 Gemini AI: {ai_status}")
-    print(f"📊 FREE Sources: {total_sources}")
-    print(f"🕰️ Started: {current_datetime_str}")
+    print(f"🤖 AI: {ai_status}")
+    print(f"📊 Sources: {total_sources}")
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -922,7 +964,7 @@ async def get_all_news_enhanced(ctx, page=1):
     """Tin tức từ CafeF và các nguồn free quốc tế"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải tin từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn miễn phí...")
+        loading_msg = await ctx.send(f"⏳")
         
         # Concurrent processing
         domestic_task = collect_news_enhanced(RSS_FEEDS['domestic'], 15)
@@ -983,8 +1025,8 @@ async def get_all_news_enhanced(ctx, page=1):
         }
         
         # Statistics
-        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 Quốc tế: {international_count} • 📊 Tổng: {len(all_news)}\n✅ 100% nguồn tin MIỄN PHÍ - Không paywall!"
-        fields_data.append(("📊 Thống kê", stats_field))
+        stats_field = f"🇻🇳 {domestic_count} • 🌍 {international_count} • 📊 {len(all_news)}"
+        fields_data.append(("📊", stats_field))
         
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '📰')
@@ -998,7 +1040,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"📰 Tin tức miễn phí (Trang {page})",
+            f"📰 Trang {page}",
             "",
             fields_data,
             0x00ff88
@@ -1008,7 +1050,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số] • 100% FREE")
+            embed.set_footer(text=f"{page}/{total_pages}")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1021,7 +1063,7 @@ async def get_international_news_enhanced(ctx, page=1):
     """Tin tức quốc tế - ONLY FREE sources"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải từ {len(RSS_FEEDS['international'])} nguồn miễn phí...")
+        loading_msg = await ctx.send(f"⏳")
         
         news_list = await collect_news_enhanced(RSS_FEEDS['international'], 20)
         await loading_msg.delete()
@@ -1039,8 +1081,8 @@ async def get_international_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 FREE International News: {len(news_list)} tin\n✅ Yahoo, CNN, Reuters, BBC, CNBC và nhiều hơn!\n🚫 Đã loại bỏ TẤT CẢ nguồn paywall (WSJ, Bloomberg, FT)"
-        fields_data.append(("📊 Thông tin", stats_field))
+        stats_field = f"🌍 {len(news_list)} tin"
+        fields_data.append(("📊", stats_field))
         
         # FREE source names only
         source_names = {
@@ -1076,7 +1118,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🌍 Tin nước ngoài miễn phí (Trang {page})",
+            f"🌍 Trang {page}",
             "",
             fields_data,
             0x0066ff
@@ -1099,7 +1141,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
     """Tin tức trong nước - CafeF"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải từ CafeF...")
+        loading_msg = await ctx.send(f"⏳")
         
         news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 15)
         await loading_msg.delete()
@@ -1117,8 +1159,8 @@ async def get_domestic_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN\n✅ Nguồn tin uy tín trong nước"
-        fields_data.append(("📊 Thông tin", stats_field))
+        stats_field = f"🇻🇳 {len(news_list)} tin"
+        fields_data.append(("📊", stats_field))
         
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
@@ -1142,7 +1184,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🇻🇳 Tin trong nước (Trang {page})",
+            f"🇻🇳 Trang {page}",
             "",
             fields_data,
             0xff0000
@@ -1182,33 +1224,32 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Save as last detail for !hoi context
         save_user_last_detail(user_id, news)
         
-        # Determine extraction method
-        if is_international_source(news['source']):
-            loading_msg = await ctx.send(f"⏳ Đang trích xuất bằng Gemini AI...")
-        else:
-            loading_msg = await ctx.send(f"⏳ Đang trích xuất nội dung...")
-        
-        # Enhanced async content extraction
-        full_content = await extract_content_enhanced(news['link'], news['source'], news)
-        
-        # Enhanced source names for FREE sources only
+        # Source names mapping
         source_names = {
-            'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
-            'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
-            'yahoo_finance_main': 'Yahoo Finance RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
+            'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
+            'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
+            'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
             'marketwatch': 'MarketWatch', 'reuters_topnews': 'Reuters', 'cnn_money': 'CNN Money',
             'cnbc': 'CNBC', 'bbc_business': 'BBC Business', 'investing_com': 'Investing.com'
         }
         
         source_name = source_names.get(news['source'], news['source'])
         
+        if is_international_source(news['source']):
+            loading_msg = await ctx.send(f"⏳ Gemini...")
+        else:
+            loading_msg = await ctx.send(f"⏳ Loading...")
+        
+        # Enhanced async content extraction
+        full_content = await extract_content_enhanced(news['link'], news['source'], news)
+        
         await loading_msg.delete()
         
         # Create content with metadata
-        main_title = f"📖 Chi tiết tin {news_number}"
+        main_title = f"📖 Tin {news_number}"
         
-        content_with_meta = f"**📰 {news['title']}**\n"
-        content_with_meta += f"**🕰️ {news['published_str']}** • **📰 {source_name}**\n\n"
+        content_with_meta = f"**{news['title']}**\n"
+        content_with_meta += f"🕰️ {news['published_str']} • 📰 {source_name}\n\n"
         content_with_meta += f"{full_content}"
         
         # Create optimized embeds
@@ -1221,7 +1262,7 @@ async def get_news_detail_enhanced(ctx, news_number: int):
                 f"[Đọc bài viết gốc]({news['link']})"
             )
             optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
-            optimized_embeds[-1].set_footer(text=f"Tin số {news_number} • FREE source")
+            optimized_embeds[-1].set_footer(text=f"#{news_number}")
         
         # Send all embeds
         for i, embed in enumerate(optimized_embeds, 1):
@@ -1233,6 +1274,44 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         
     except ValueError:
         await ctx.send("❌ Vui lòng nhập số! Ví dụ: `!chitiet 5`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
+
+@bot.command(name='debate')
+async def gemini_debate_system(ctx, *, topic=""):
+    """Tranh luận đa góc nhìn"""
+    try:
+        if not gemini_engine.available:
+            await ctx.send("❌ Gemini AI không khả dụng.")
+            return
+        
+        if not topic:
+            user_id = ctx.author.id
+            if user_id in user_last_detail_cache:
+                last_detail = user_last_detail_cache[user_id]
+                time_diff = get_current_vietnam_datetime() - last_detail['timestamp']
+                
+                if time_diff.total_seconds() < 1800:
+                    article = last_detail['article']
+                    topic = f"Bài báo: {article['title']}"
+                else:
+                    await ctx.send("❌ Nhập chủ đề hoặc xem bài báo trước.")
+                    return
+            else:
+                await ctx.send("❌ Nhập chủ đề! Ví dụ: `!debate lạm phát`")
+                return
+        
+        loading_msg = await ctx.send(f"⏳")
+        
+        debate_result = await gemini_engine.debate_perspectives(topic)
+        
+        optimized_embeds = create_optimized_embeds(f"🎭 Debate", debate_result, 0xff6600)
+        
+        await loading_msg.edit(embed=optimized_embeds[0])
+        
+        for embed in optimized_embeds[1:]:
+            await ctx.send(embed=embed)
+        
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {str(e)}")
 
@@ -1267,8 +1346,8 @@ async def enhanced_gemini_question(ctx, *, question):
                     context = f"BÀI BÁO LIÊN QUAN:\nTiêu đề: {article['title']}\nNguồn: {article['source']}\nNội dung: {article_content[:1500]}"
         
         progress_embed = create_safe_embed(
-            "🤖 Gemini AI",
-            f"Đang phân tích: {question[:100]}...",
+            "🤖 AI",
+            f"⏳",
             0x9932cc
         )
         
@@ -1281,11 +1360,11 @@ async def enhanced_gemini_question(ctx, *, question):
             analysis_result = await gemini_engine.ask_question(question, context)
         
         # Create optimized embeds
-        title = f"🤖 Gemini AI"
+        title = f"🤖 AI"
         optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
         
         if optimized_embeds:
-            optimized_embeds[-1].set_footer(text=f"Gemini AI • FREE sources")
+            optimized_embeds[-1].set_footer(text=f"AI")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1298,65 +1377,53 @@ async def enhanced_gemini_question(ctx, *, question):
 
 @bot.command(name='menu')
 async def help_command_optimized(ctx):
-    """Simple menu guide for FREE sources"""
+    """Menu"""
     
     main_embed = create_safe_embed(
-        "📰 News Bot - 100% FREE Sources",
-        "CafeF + CNN + Reuters + Yahoo + BBC + 10+ sources miễn phí!",
-        0x00ff88
-    )
-    
-    safe_name1, safe_value1 = validate_embed_field(
-        "📰 Lệnh tin tức",
-        "**!all [trang]** - Tất cả tin tức\n**!in [trang]** - Tin trong nước\n**!out [trang]** - Tin nước ngoài\n**!chitiet [số]** - Chi tiết bài viết"
-    )
-    main_embed.add_field(name=safe_name1, value=safe_value1, inline=False)
-    
-    safe_name2, safe_value2 = validate_embed_field(
-        "🤖 Lệnh AI",
-        "**!hoi [câu hỏi]** - Hỏi AI\n**!status** - Trạng thái hệ thống"
-    )
-    main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
-    
-    safe_name3, safe_value3 = validate_embed_field(
-        "✅ Cải tiến 2025",
-        "🚫 Đã loại bỏ TẤT CẢ nguồn paywall\n⚡ Tối ưu async - không bị heartbeat block\n🤖 Gemini AI trích xuất thông minh\n📱 100% nguồn tin miễn phí"
-    )
-    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
-    
-    await ctx.send(embed=main_embed)
-
-@bot.command(name='status')
-async def status_command(ctx):
-    """Hiển thị trạng thái hệ thống - FREE sources only"""
-    
-    total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
-    global_cache_size = len(global_seen_articles)
-    
-    main_embed = create_safe_embed(
-        "📊 Trạng thái hệ thống - FREE Sources Only",
+        "📰 Commands",
         "",
         0x00ff88
     )
     
     safe_name1, safe_value1 = validate_embed_field(
-        "📰 Nguồn tin",
-        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 International: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n✅ 100% nguồn tin MIỄN PHÍ\n🚫 Đã loại bỏ WSJ, Bloomberg, FT"
+        "📰 News",
+        "!all [page] - All\n!in [page] - Domestic\n!out [page] - International\n!chitiet [num] - Details"
+    )
+    main_embed.add_field(name=safe_name1, value=safe_value1, inline=False)
+    
+    safe_name2, safe_value2 = validate_embed_field(
+        "🤖 AI", 
+        "!hoi [question] - Ask AI\n!debate [topic] - Debate\n!status - Status"
+    )
+    main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
+    
+    await ctx.send(embed=main_embed)
+
+@bot.command(name='status')
+async def status_command(ctx):
+    """Status"""
+    
+    total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+    global_cache_size = len(global_seen_articles)
+    
+    main_embed = create_safe_embed(
+        "📊 Status",
+        "",
+        0x00ff88
+    )
+    
+    safe_name1, safe_value1 = validate_embed_field(
+        "📰 Sources",
+        f"🇻🇳 {len(RSS_FEEDS['domestic'])}\n🌍 {len(RSS_FEEDS['international'])}\n📊 {total_sources} total"
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
     gemini_status = "✅" if gemini_engine.available else "❌"
     safe_name2, safe_value2 = validate_embed_field(
-        "🤖 AI System",
-        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}\n⚡ Async optimized\n🚫 No blocking functions"
+        "🤖 AI",
+        f"Gemini: {gemini_status}\nCache: {global_cache_size}"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=True)
-    
-    safe_name3, safe_value3 = validate_embed_field(
-        "🔧 Cải tiến 2025",
-        f"✅ Fixed heartbeat blocking\n✅ aiohttp thay requests\n✅ asyncio.sleep thay time.sleep\n✅ Concurrent processing\n✅ Gemini content extraction"
-    )
-    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
     
     await ctx.send(embed=main_embed)
 
@@ -1368,14 +1435,11 @@ if __name__ == "__main__":
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
         
-        print("🚀 Starting ENHANCED FREE RSS News Bot...")
+        print("🚀 Enhanced News Bot...")
         print(f"🔧 FREE Sources: {total_sources}")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
-        print("✅ FIXED: Heartbeat blocking với async/await")
-        print("✅ FIXED: Loại bỏ TẤT CẢ nguồn paywall")
-        print("✅ FIXED: Content extraction với Gemini")
-        print("⚡ NO MORE: time.sleep, requests blocking")
-        print("=" * 40)
+        print("✅ Fixed: Heartbeat, Paywall, Content")
+        print("=" * 30)
         
         bot.run(TOKEN)
         
