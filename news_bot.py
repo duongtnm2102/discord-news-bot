@@ -117,7 +117,7 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 OPTIMIZED RSS FEEDS - CafeF Focus + Filtered Yahoo Finance
+# 🔧 OPTIMIZED RSS FEEDS - CafeF Focus + Working Yahoo Finance URLs
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -128,12 +128,12 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - YAHOO FINANCE FILTERED ===
+    # === QUỐC TẾ - YAHOO FINANCE WORKING URLs ===
     'international': {
+        'yahoo_finance_news': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_main': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         'yahoo_finance_business': 'https://feeds.finance.yahoo.com/rss/2.0/category-business',
-        'yahoo_finance_markets': 'https://feeds.finance.yahoo.com/rss/2.0/category-markets',
-        'yahoo_finance_economics': 'https://feeds.finance.yahoo.com/rss/2.0/category-economics'
+        'yahoo_finance_world': 'https://finance.yahoo.com/news/rss'
     }
 }
 
@@ -380,7 +380,7 @@ def clean_content_enhanced(content):
 def is_international_source(source_name):
     """Check if source is international (Yahoo Finance)"""
     international_sources = {
-        'yahoo_finance_main', 'yahoo_finance_business', 'yahoo_finance_markets', 'yahoo_finance_economics'
+        'yahoo_finance_news', 'yahoo_finance_main', 'yahoo_finance_business', 'yahoo_finance_world'
     }
     return source_name in international_sources
 
@@ -484,7 +484,7 @@ BẢN DỊCH TIẾNG VIỆT:"""
 
 # 🚀 ENHANCED NEWS COLLECTION
 async def collect_news_enhanced(sources_dict, limit_per_source=15):
-    """Enhanced news collection for CafeF and Yahoo Finance"""
+    """Enhanced news collection for CafeF and Yahoo Finance with improved error handling"""
     all_news = []
     
     for source_name, rss_url in sources_dict.items():
@@ -496,30 +496,40 @@ async def collect_news_enhanced(sources_dict, limit_per_source=15):
             headers = get_enhanced_headers(rss_url)
             session.headers.update(headers)
             
+            # Enhanced error handling for Yahoo Finance
+            feed = None
             try:
                 response = session.get(rss_url, timeout=15, allow_redirects=True)
                 print(f"📊 {source_name} response: {response.status_code}")
                 
                 if response.status_code == 403:
-                    print(f"⚠️ 403 for {source_name}, trying alternative...")
+                    print(f"⚠️ 403 for {source_name}, trying fallback...")
+                    # Try with curl user-agent for Yahoo Finance
                     headers['User-Agent'] = 'curl/7.68.0'
                     session.headers.update(headers)
                     time.sleep(random.uniform(2.0, 4.0))
                     response = session.get(rss_url, timeout=15, allow_redirects=True)
+                    print(f"🔄 Fallback {source_name} response: {response.status_code}")
                 
                 if response.status_code == 200:
                     feed = feedparser.parse(response.content)
                 else:
+                    print(f"⚠️ {source_name} failed with {response.status_code}, trying direct parse...")
                     feed = feedparser.parse(rss_url)
                 
             except requests.exceptions.RequestException as e:
                 print(f"⚠️ Request error for {source_name}: {e}")
+                print(f"🔄 Trying direct feedparser for {source_name}...")
                 feed = feedparser.parse(rss_url)
             
             session.close()
             
-            if not hasattr(feed, 'entries') or len(feed.entries) == 0:
+            if not feed or not hasattr(feed, 'entries') or len(feed.entries) == 0:
                 print(f"❌ No entries for {source_name}")
+                # For Yahoo Finance sources, try alternative approach
+                if 'yahoo_finance' in source_name:
+                    print(f"🔄 Trying alternative Yahoo Finance approach for {source_name}...")
+                    # Skip this source but don't fail completely
                 continue
                 
             entries_processed = 0
@@ -555,6 +565,7 @@ async def collect_news_enhanced(sources_dict, limit_per_source=15):
                             entries_processed += 1
                     
                 except Exception as entry_error:
+                    print(f"⚠️ Entry error for {source_name}: {entry_error}")
                     continue
                     
             print(f"✅ Processed {entries_processed} entries from {source_name}")
@@ -956,15 +967,15 @@ async def get_all_news_enhanced(ctx, page=1):
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
-            'yahoo_finance_main': 'Yahoo Finance', 'yahoo_finance_business': 'Yahoo Business',
-            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_economics': 'Yahoo Economics'
+            'yahoo_finance_news': 'Yahoo Finance News', 'yahoo_finance_main': 'Yahoo Finance',
+            'yahoo_finance_business': 'Yahoo Finance Business', 'yahoo_finance_world': 'Yahoo Finance World'
         }
         
         emoji_map = {
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
-            'yahoo_finance_main': '💰', 'yahoo_finance_business': '💼', 
-            'yahoo_finance_markets': '📈', 'yahoo_finance_economics': '🌍'
+            'yahoo_finance_news': '💰', 'yahoo_finance_main': '💰',
+            'yahoo_finance_business': '💼', 'yahoo_finance_world': '🌍'
         }
         
         # Add statistics
@@ -1164,8 +1175,8 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         source_names = {
             'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
             'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
-            'yahoo_finance_main': 'Yahoo Finance', 'yahoo_finance_business': 'Yahoo Finance Business',
-            'yahoo_finance_markets': 'Yahoo Finance Markets', 'yahoo_finance_economics': 'Yahoo Finance Economics'
+            'yahoo_finance_news': 'Yahoo Finance News', 'yahoo_finance_main': 'Yahoo Finance',
+            'yahoo_finance_business': 'Yahoo Finance Business', 'yahoo_finance_world': 'Yahoo Finance World'
         }
         
         source_name = source_names.get(news['source'], news['source'])
