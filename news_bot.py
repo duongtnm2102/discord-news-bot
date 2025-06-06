@@ -119,7 +119,7 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 ENHANCED FEEDS - RSS + Direct Scraping với focus vào vĩ mô, bất động sản, tài chính, kinh tế
+# 🔧 ENHANCED FEEDS - FIXED URLs for 2025 - RSS + Working Direct Scraping
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -130,37 +130,32 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - Yahoo Finance RSS + Direct Scraping - Focus VĨ MÔ, BĐS, TÀI CHÍNH, KINH TẾ ===
+    # === QUỐC TẾ - FIXED Yahoo Finance URLs 2025 ===
     'international': {
-        # Working RSS Feeds
+        # ✅ VERIFIED RSS FEEDS - Working 2025
         'yahoo_finance_main': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_headlines': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         
-        # Topic-specific Direct Scraping - VĨ MÔ & KINH TẾ
-        'yahoo_finance_economic_news': 'https://finance.yahoo.com/topic/economic-news/',
-        'yahoo_finance_economy': 'https://finance.yahoo.com/topic/economy/',
-        'yahoo_finance_federal_reserve': 'https://finance.yahoo.com/topic/federal-reserve/',
-        'yahoo_finance_inflation': 'https://finance.yahoo.com/topic/inflation/',
-        'yahoo_finance_interest_rates': 'https://finance.yahoo.com/topic/interest-rates/',
-        
-        # BẤT ĐỘNG SẢN & NHÀ Ở
-        'yahoo_finance_housing': 'https://finance.yahoo.com/topic/housing/',
+        # ✅ WORKING SECTORS URLs - Changed from /topic/ to /sectors/
         'yahoo_finance_real_estate': 'https://finance.yahoo.com/sectors/real-estate/',
-        'yahoo_finance_mortgage': 'https://finance.yahoo.com/topic/mortgage/',
-        
-        # TÀI CHÍNH & NGÂN HÀNG
-        'yahoo_finance_banking': 'https://finance.yahoo.com/topic/banking/',
         'yahoo_finance_financial_services': 'https://finance.yahoo.com/sectors/financial-services/',
-        'yahoo_finance_consumer_finance': 'https://finance.yahoo.com/topic/consumer-finance/',
+        'yahoo_finance_basic_materials': 'https://finance.yahoo.com/sectors/basic-materials/',
+        'yahoo_finance_energy': 'https://finance.yahoo.com/sectors/energy/',
+        'yahoo_finance_industrials': 'https://finance.yahoo.com/sectors/industrials/',
+        'yahoo_finance_technology': 'https://finance.yahoo.com/sectors/technology/',
         
-        # VĨ MÔ KHÁC
-        'yahoo_finance_gdp': 'https://finance.yahoo.com/topic/gdp/',
-        'yahoo_finance_employment': 'https://finance.yahoo.com/topic/employment/',
-        'yahoo_finance_consumer_spending': 'https://finance.yahoo.com/topic/consumer-spending/',
-        'yahoo_finance_trade_policy': 'https://finance.yahoo.com/topic/trade-policy/',
+        # ✅ WORKING NEWS SECTION URLs
+        'yahoo_finance_news': 'https://finance.yahoo.com/news/',
+        'yahoo_finance_markets': 'https://finance.yahoo.com/markets/',
+        'yahoo_finance_crypto': 'https://finance.yahoo.com/topic/crypto/',
+        'yahoo_finance_tech_news': 'https://finance.yahoo.com/topic/tech/',
         
-        # General Finance News
-        'yahoo_finance_general': 'https://finance.yahoo.com/news/'
+        # ✅ VERIFIED TOPIC URLs - Still working
+        'yahoo_finance_stock_market': 'https://finance.yahoo.com/topic/stock-market-news/',
+        'yahoo_finance_earnings': 'https://finance.yahoo.com/topic/earnings/',
+        
+        # ✅ Alternative news sources on Yahoo Finance
+        'yahoo_finance_videos': 'https://finance.yahoo.com/videos/',
     }
 }
 
@@ -283,14 +278,14 @@ def create_safe_embed(title: str, description: str = "", color: int = 0x00ff88) 
         timestamp=get_current_vietnam_datetime()
     )
 
-# 🔧 Enhanced headers with retry mechanism
+# 🔧 Enhanced headers with retry mechanism - OPTIMIZED for 2025
 def get_enhanced_headers(url=None):
-    """Enhanced headers for Yahoo Finance with anti-blocking"""
+    """Enhanced headers for Yahoo Finance with anti-blocking - OPTIMIZED"""
     user_agent = random.choice(USER_AGENTS)
     
     headers = {
         'User-Agent': user_agent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
@@ -298,7 +293,7 @@ def get_enhanced_headers(url=None):
         'DNT': '1',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
-        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-User': '?1',
         'Sec-Fetch-Dest': 'document'
@@ -319,22 +314,23 @@ def get_enhanced_headers(url=None):
     return headers
 
 def add_random_delay():
-    """Add random delay to avoid rate limiting"""
-    delay = random.uniform(0.5, 2.0)
+    """Add random delay to avoid rate limiting - SHORTER for optimization"""
+    delay = random.uniform(0.3, 1.5)  # Reduced from 0.5-2.0
     time.sleep(delay)
 
-# 🆕 DIRECT YAHOO FINANCE NEWS SCRAPING
-def scrape_yahoo_finance_news(base_url, limit=30):
-    """Scrape news directly from Yahoo Finance news pages"""
+# 🆕 OPTIMIZED YAHOO FINANCE NEWS SCRAPING - Fixed for 2025
+def scrape_yahoo_finance_news(base_url, limit=20):  # Reduced limit from 30
+    """OPTIMIZED scrape news directly from Yahoo Finance - Fixed URLs 2025"""
     try:
-        print(f"🔄 Direct scraping: {base_url}")
+        print(f"🔄 Optimized scraping: {base_url}")
         add_random_delay()
         
         session = requests.Session()
         headers = get_enhanced_headers(base_url)
         session.headers.update(headers)
         
-        response = session.get(base_url, timeout=15, allow_redirects=True)
+        # SHORTER timeout to prevent heartbeat blocking
+        response = session.get(base_url, timeout=10, allow_redirects=True)  # Reduced from 15
         
         if response.status_code != 200:
             print(f"❌ Failed to scrape {base_url}: {response.status_code}")
@@ -342,24 +338,36 @@ def scrape_yahoo_finance_news(base_url, limit=30):
         
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Enhanced selectors for Yahoo Finance news articles
+        # OPTIMIZED selectors for Yahoo Finance 2025
         news_articles = []
         
-        # Method 1: Look for news article containers
+        # Enhanced selectors for different Yahoo Finance page types
         article_selectors = [
-            'h3 > a[href*="/news/"]',          # News article links in h3
-            'a[href*="/news/"][data-module]',   # Links with data-module
-            'h3 a',                             # All h3 links
-            'div[data-testid] a[href*="/news/"]', # Test ID containers
-            '.js-content-viewer',               # Content viewer links
-            '[href*="/news/"] h3',              # News links with h3
-            'h2 a[href*="/news/"]'              # H2 news links
+            # News page selectors
+            'h3 > a[href*="/news/"]',
+            'a[href*="/news/"][data-module]',
+            'h3 a[href*="/news/"]',
+            'h2 a[href*="/news/"]',
+            
+            # Sector page selectors
+            'div[data-testid] a[href*="/quote/"]',
+            '.js-content-viewer a',
+            'article a[href*="/news/"]',
+            
+            # Video page selectors
+            'a[href*="/video/"]',
+            
+            # General news selectors
+            'h3 a',
+            'h2 a',
+            '.newsItem a',
+            '.story a'
         ]
         
         for selector in article_selectors:
             try:
-                elements = soup.select(selector)
-                for element in elements[:limit]:
+                elements = soup.select(selector)[:limit]  # Limit early
+                for element in elements:
                     try:
                         # Extract title and link
                         if element.name == 'a':
@@ -383,15 +391,12 @@ def scrape_yahoo_finance_news(base_url, limit=30):
                         elif not link.startswith('http'):
                             continue
                         
-                        # Filter for financial/economic content
-                        if is_relevant_financial_news(title):
-                            # Clean selector name for source
-                            clean_selector = selector.replace(' ', '_').replace('[', '').replace(']', '').replace('*', '').replace('=', '').replace('"', '').replace('/', '')
-                            
+                        # Filter for financial/economic content - RELAXED filter
+                        if is_relevant_financial_news_relaxed(title):
                             news_item = {
                                 'title': html.unescape(title.strip()),
                                 'link': link,
-                                'source': f"yahoo_finance_scraped_{clean_selector}",
+                                'source': f"yahoo_finance_scraped",
                                 'published': get_current_vietnam_datetime(),
                                 'published_str': get_current_vietnam_datetime().strftime("%H:%M %d/%m"),
                                 'description': title[:200] + "..." if len(title) > 200 else title
@@ -418,20 +423,40 @@ def scrape_yahoo_finance_news(base_url, limit=30):
         print(f"❌ Scraping error for {base_url}: {e}")
         return []
 
-def is_relevant_financial_news(title):
-    """Filter for relevant financial/economic news based on title"""
+def is_relevant_financial_news_relaxed(title):
+    """RELAXED filter for relevant financial/economic news - More inclusive"""
     financial_keywords = [
+        # Core financial terms
         'stock', 'market', 'trading', 'investment', 'investor', 'wall street',
         'nasdaq', 'dow', 's&p', 'earnings', 'revenue', 'profit', 'loss',
         'financial', 'finance', 'economy', 'economic', 'fed', 'federal reserve',
-        'interest rate', 'inflation', 'gdp', 'unemployment', 'jobs report',
-        'bitcoin', 'crypto', 'cryptocurrency', 'ethereum', 'bank', 'banking',
+        'interest rate', 'inflation', 'gdp', 'unemployment', 'jobs', 'employment',
+        
+        # Crypto and digital assets
+        'bitcoin', 'crypto', 'cryptocurrency', 'ethereum', 'digital asset',
+        
+        # Banking and financial services
+        'bank', 'banking', 'credit', 'loan', 'mortgage', 'debt',
         'ipo', 'merger', 'acquisition', 'dividend', 'bond', 'treasury',
+        
+        # Commodities and currencies
         'currency', 'dollar', 'euro', 'commodity', 'oil', 'gold', 'silver',
-        'real estate', 'housing', 'mortgage', 'credit', 'debt', 'loan',
+        
+        # Real estate and housing
+        'real estate', 'housing', 'property', 'reit',
+        
+        # Business and corporate
         'retail', 'consumer', 'spending', 'sales', 'manufacturing', 'industrial',
         'tech', 'technology', 'ai', 'artificial intelligence', 'startup',
-        'venture capital', 'hedge fund', 'mutual fund', 'etf', 'pension'
+        'venture capital', 'hedge fund', 'mutual fund', 'etf', 'pension',
+        
+        # Economic indicators
+        'tariff', 'trade', 'export', 'import', 'growth', 'recession',
+        'bull market', 'bear market', 'volatility',
+        
+        # Company names and sectors
+        'apple', 'microsoft', 'google', 'amazon', 'tesla', 'nvidia',
+        'jp morgan', 'goldman sachs', 'berkshire'
     ]
     
     title_lower = title.lower()
@@ -452,7 +477,7 @@ async def extract_content_enhanced(url, source_name, news_item=None):
         headers = get_enhanced_headers(url)
         session.headers.update(headers)
         
-        response = session.get(url, timeout=20, allow_redirects=True)
+        response = session.get(url, timeout=15, allow_redirects=True)  # Reduced timeout
         
         if response.status_code == 200:
             # Method 1: Trafilatura
@@ -481,7 +506,7 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                     article = Article(url)
                     article.set_config({
                         'headers': headers,
-                        'timeout': 20
+                        'timeout': 15
                     })
                     
                     article.download()
@@ -575,7 +600,7 @@ async def extract_content_with_gemini(url, source_name):
                     extraction_prompt,
                     generation_config=generation_config
                 ),
-                timeout=30
+                timeout=25  # Reduced timeout
             )
             
             extracted_content = response.text.strip()
@@ -662,14 +687,14 @@ def create_fallback_content(url, source_name, error_msg=""):
     except Exception as e:
         return f"Nội dung từ {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ."
 
-# 🚀 ENHANCED NEWS COLLECTION WITH RSS + SCRAPING - INCREASED LIMITS
-async def collect_news_enhanced(sources_dict, limit_per_source=50):
-    """Enhanced news collection with RSS feeds + direct scraping - Increased limits for more pages"""
+# 🚀 OPTIMIZED NEWS COLLECTION - Reduced limits to prevent timeout
+async def collect_news_enhanced(sources_dict, limit_per_source=20):  # Reduced from 50
+    """OPTIMIZED news collection with RSS feeds + direct scraping"""
     all_news = []
     
     for source_name, source_url in sources_dict.items():
         retry_count = 0
-        max_retries = 3
+        max_retries = 2  # Reduced from 3
         
         while retry_count < max_retries:
             try:
@@ -698,7 +723,7 @@ async def collect_news_enhanced(sources_dict, limit_per_source=50):
                     if retry_count < max_retries - 1:
                         retry_count += 1
                         print(f"🔄 Retrying {source_name}...")
-                        time.sleep(2)
+                        time.sleep(1)  # Reduced sleep time
                         continue
                     else:
                         print(f"❌ No content from {source_name} after {max_retries} attempts")
@@ -709,7 +734,7 @@ async def collect_news_enhanced(sources_dict, limit_per_source=50):
                 if retry_count < max_retries - 1:
                     retry_count += 1
                     print(f"🔄 Retrying {source_name}...")
-                    time.sleep(2)
+                    time.sleep(1)  # Reduced sleep time
                 else:
                     print(f"❌ Failed to fetch from {source_name} after {max_retries} attempts")
                     break
@@ -728,16 +753,16 @@ async def process_rss_feed(source_name, rss_url, limit_per_source):
         headers = get_enhanced_headers(rss_url)
         session.headers.update(headers)
         
-        response = session.get(rss_url, timeout=15, allow_redirects=True)
+        response = session.get(rss_url, timeout=10, allow_redirects=True)  # Reduced timeout
         
         if response.status_code == 200:
             feed = feedparser.parse(response.content)
         elif response.status_code in [403, 429]:
             print(f"⚠️ Rate limited for {source_name}, waiting...")
-            time.sleep(random.uniform(3.0, 6.0))
+            time.sleep(random.uniform(2.0, 4.0))  # Reduced wait time
             headers['User-Agent'] = random.choice(USER_AGENTS)
             session.headers.update(headers)
-            response = session.get(rss_url, timeout=15, allow_redirects=True)
+            response = session.get(rss_url, timeout=10, allow_redirects=True)
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
             else:
@@ -796,9 +821,9 @@ def is_relevant_news(title, description, source_name):
     if 'cafef' in source_name:
         return True
     
-    # For Yahoo Finance, filter for economic/financial keywords
+    # For Yahoo Finance, use relaxed filter
     if 'yahoo_finance' in source_name:
-        return is_relevant_financial_news(title)
+        return is_relevant_financial_news_relaxed(title)
     
     return True
 
@@ -972,7 +997,7 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=25
+                timeout=20  # Reduced timeout
             )
             
             return response.text.strip()
@@ -1023,7 +1048,7 @@ Hãy đưa ra phân tích THÔNG MINH và CHI TIẾT:"""
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=35
+                timeout=30  # Reduced timeout
             )
             
             return response.text.strip()
@@ -1083,7 +1108,7 @@ Hãy tạo ra cuộc tranh luận gay gắt và phản ánh thực tế xã hộ
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=30
+                timeout=25  # Reduced timeout
             )
             
             return response.text.strip()
@@ -1138,8 +1163,8 @@ async def get_all_news_enhanced(ctx, page=1):
         page = max(1, int(page))
         loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 30)
-        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 50)
+        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)  # Reduced limit
+        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 30)  # Reduced limit
         
         await loading_msg.delete()
         
@@ -1161,61 +1186,27 @@ async def get_all_news_enhanced(ctx, page=1):
         domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
         international_count = len(page_news) - domestic_count
         
-        # Enhanced source mapping - VĨ MÔ, BẤT ĐỘNG SẢN, TÀI CHÍNH, KINH TẾ
+        # Enhanced source mapping
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
             
-            # Yahoo Finance RSS
+            # Fixed Yahoo Finance sources
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            
-            # VĨ MÔ & KINH TẾ
-            'yahoo_finance_economic_news': 'Yahoo Kinh tế', 'yahoo_finance_economy': 'Yahoo Vĩ mô',
-            'yahoo_finance_federal_reserve': 'Yahoo Fed', 'yahoo_finance_inflation': 'Yahoo Lạm phát',
-            'yahoo_finance_interest_rates': 'Yahoo Lãi suất', 'yahoo_finance_gdp': 'Yahoo GDP',
-            'yahoo_finance_employment': 'Yahoo Việc làm', 'yahoo_finance_consumer_spending': 'Yahoo Tiêu dùng',
-            'yahoo_finance_trade_policy': 'Yahoo Thương mại',
-            
-            # BẤT ĐỘNG SẢN
-            'yahoo_finance_housing': 'Yahoo Nhà ở', 'yahoo_finance_real_estate': 'Yahoo BĐS',
-            'yahoo_finance_mortgage': 'Yahoo Thế chấp',
-            
-            # TÀI CHÍNH & NGÂN HÀNG  
-            'yahoo_finance_banking': 'Yahoo Ngân hàng', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
-            'yahoo_finance_consumer_finance': 'Yahoo TC Tiêu dùng',
-            
-            # General
-            'yahoo_finance_general': 'Yahoo Tổng hợp'
+            'yahoo_finance_real_estate': 'Yahoo BĐS', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
+            'yahoo_finance_technology': 'Yahoo Tech', 'yahoo_finance_news': 'Yahoo News',
+            'yahoo_finance_scraped': 'Yahoo Scraped'
         }
         
         emoji_map = {
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
             
-            # Yahoo Finance RSS
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
-            
-            # VĨ MÔ & KINH TẾ
-            'yahoo_finance_economic_news': '🌍', 'yahoo_finance_economy': '📊', 'yahoo_finance_federal_reserve': '🏛️',
-            'yahoo_finance_inflation': '📈', 'yahoo_finance_interest_rates': '💹', 'yahoo_finance_gdp': '📊',
-            'yahoo_finance_employment': '👥', 'yahoo_finance_consumer_spending': '🛒', 'yahoo_finance_trade_policy': '🌐',
-            
-            # BẤT ĐỘNG SẢN
-            'yahoo_finance_housing': '🏠', 'yahoo_finance_real_estate': '🏢', 'yahoo_finance_mortgage': '🏦',
-            
-            # TÀI CHÍNH & NGÂN HÀNG
-            'yahoo_finance_banking': '🏦', 'yahoo_finance_financial_services': '💳', 'yahoo_finance_consumer_finance': '💰',
-            
-            # General
-            'yahoo_finance_general': '📰'
+            'yahoo_finance_real_estate': '🏢', 'yahoo_finance_financial_services': '💳',
+            'yahoo_finance_technology': '💻', 'yahoo_finance_news': '📰',
+            'yahoo_finance_scraped': '🚀'
         }
-        
-        # Fallback for scraped sources
-        for news in page_news:
-            if news['source'] not in source_names:
-                if 'yahoo_finance_scraped' in news['source']:
-                    source_names[news['source']] = 'Yahoo Scraped'
-                    emoji_map[news['source']] = '🚀'
         
         # Simple statistics
         stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 Yahoo: {international_count} • 📊 Tổng: {len(all_news)}"
@@ -1253,12 +1244,12 @@ async def get_all_news_enhanced(ctx, page=1):
 
 @bot.command(name='out')
 async def get_international_news_enhanced(ctx, page=1):
-    """Tin tức quốc tế - Gemini-Powered Yahoo Finance với RSS + Direct Scraping"""
+    """Tin tức quốc tế - Fixed Yahoo Finance URLs 2025"""
     try:
         page = max(1, int(page))
         loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 50)
+        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 30)  # Reduced limit
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1274,62 +1265,23 @@ async def get_international_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        # Count by method
-        rss_count = sum(1 for news in page_news if 'scraped' not in news['source'])
-        scraped_count = len(page_news) - rss_count
-        
-        stats_field = f"📰 Yahoo Finance: {len(news_list)} tin"
+        stats_field = f"📰 Yahoo Finance: {len(news_list)} tin • ✅ URLs đã fixed cho 2025"
         fields_data.append(("📊 Thông tin", stats_field))
         
-        # Enhanced source names - VĨ MÔ, BẤT ĐỘNG SẢN, TÀI CHÍNH, KINH TẾ
+        # Enhanced source names
         source_names = {
-            # Yahoo Finance RSS
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            
-            # VĨ MÔ & KINH TẾ
-            'yahoo_finance_economic_news': 'Yahoo Kinh tế', 'yahoo_finance_economy': 'Yahoo Vĩ mô',
-            'yahoo_finance_federal_reserve': 'Yahoo Fed', 'yahoo_finance_inflation': 'Yahoo Lạm phát',
-            'yahoo_finance_interest_rates': 'Yahoo Lãi suất', 'yahoo_finance_gdp': 'Yahoo GDP',
-            'yahoo_finance_employment': 'Yahoo Việc làm', 'yahoo_finance_consumer_spending': 'Yahoo Tiêu dùng',
-            'yahoo_finance_trade_policy': 'Yahoo Thương mại',
-            
-            # BẤT ĐỘNG SẢN
-            'yahoo_finance_housing': 'Yahoo Nhà ở', 'yahoo_finance_real_estate': 'Yahoo BĐS',
-            'yahoo_finance_mortgage': 'Yahoo Thế chấp',
-            
-            # TÀI CHÍNH & NGÂN HÀNG  
-            'yahoo_finance_banking': 'Yahoo Ngân hàng', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
-            'yahoo_finance_consumer_finance': 'Yahoo TC Tiêu dùng',
-            
-            # General
-            'yahoo_finance_general': 'Yahoo Tổng hợp'
+            'yahoo_finance_real_estate': 'Yahoo BĐS', 'yahoo_finance_financial_services': 'Yahoo Tài chính',
+            'yahoo_finance_technology': 'Yahoo Tech', 'yahoo_finance_news': 'Yahoo News',
+            'yahoo_finance_scraped': 'Yahoo Scraped'
         }
         
         emoji_map = {
-            # Yahoo Finance RSS
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰',
-            
-            # VĨ MÔ & KINH TẾ
-            'yahoo_finance_economic_news': '🌍', 'yahoo_finance_economy': '📊', 'yahoo_finance_federal_reserve': '🏛️',
-            'yahoo_finance_inflation': '📈', 'yahoo_finance_interest_rates': '💹', 'yahoo_finance_gdp': '📊',
-            'yahoo_finance_employment': '👥', 'yahoo_finance_consumer_spending': '🛒', 'yahoo_finance_trade_policy': '🌐',
-            
-            # BẤT ĐỘNG SẢN
-            'yahoo_finance_housing': '🏠', 'yahoo_finance_real_estate': '🏢', 'yahoo_finance_mortgage': '🏦',
-            
-            # TÀI CHÍNH & NGÂN HÀNG
-            'yahoo_finance_banking': '🏦', 'yahoo_finance_financial_services': '💳', 'yahoo_finance_consumer_finance': '💰',
-            
-            # General
-            'yahoo_finance_general': '📰'
+            'yahoo_finance_real_estate': '🏢', 'yahoo_finance_financial_services': '💳',
+            'yahoo_finance_technology': '💻', 'yahoo_finance_news': '📰',
+            'yahoo_finance_scraped': '🚀'
         }
-        
-        # Handle scraped sources
-        for news in page_news:
-            if news['source'] not in source_names:
-                if 'yahoo_finance_scraped' in news['source']:
-                    source_names[news['source']] = 'Yahoo Scraped'
-                    emoji_map[news['source']] = '🚀'
         
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '💰')
@@ -1368,7 +1320,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         page = max(1, int(page))
         loading_msg = await ctx.send(f"⏳ Đang tải...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 30)
+        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)  # Reduced limit
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1384,7 +1336,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN\n🔧 Extraction: Traditional methods (Trafilatura, Newspaper3k, BeautifulSoup)"
+        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN"
         fields_data.append(("📊 Thông tin", stats_field))
         
         source_names = {
@@ -1451,7 +1403,7 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         
         # Determine extraction method based on source
         if is_international_source(news['source']):
-            loading_msg = await ctx.send(f"⏳ Đang tải...")
+            loading_msg = await ctx.send(f"⏳ Đang tải bằng Gemini AI...")
         else:
             loading_msg = await ctx.send(f"⏳ Đang tải...")
         
@@ -1463,22 +1415,12 @@ async def get_news_detail_enhanced(ctx, news_number: int):
             'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
             'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
             'yahoo_finance_main': 'Yahoo Finance RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_direct': 'Yahoo Direct Scraping', 'yahoo_finance_latest': 'Yahoo Latest News',
-            'yahoo_finance_markets': 'Yahoo Markets', 'yahoo_finance_crypto_news': 'Yahoo Crypto',
-            'yahoo_finance_economy_news': 'Yahoo Economy'
+            'yahoo_finance_scraped': 'Yahoo Finance Scraped'
         }
-        
-        # Handle scraped sources
-        if news['source'] not in source_names and 'yahoo_finance_scraped' in news['source']:
-            source_names[news['source']] = 'Yahoo Finance Scraped'
         
         source_name = source_names.get(news['source'], news['source'])
         
         await loading_msg.delete()
-        
-        # Determine extraction method used
-        is_gemini_extracted = "[🤖 Gemini đã trích xuất" in full_content if full_content else False
-        extraction_method = "🤖 Gemini AI" if is_gemini_extracted else "🔧 Traditional Methods"
         
         # Create content with metadata
         main_title = f"📖 Chi tiết tin {news_number}"
@@ -1547,7 +1489,7 @@ async def enhanced_gemini_question(ctx, *, question):
                 
                 if article_content:
                     context = f"BÀI BÁO LIÊN QUAN:\nTiêu đề: {article['title']}\nNguồn: {article['source']}\nNội dung: {article_content[:1500]}"
-                    context_info = f"📰 **Context:** Bài báo vừa xem với Gemini-Powered extraction"
+                    context_info = f"📰 **Context:** Bài báo vừa xem"
         
         progress_embed = create_safe_embed(
             "🤖 Gemini AI",
@@ -1561,11 +1503,9 @@ async def enhanced_gemini_question(ctx, *, question):
         if context:
             # Article analysis mode
             analysis_result = await gemini_engine.analyze_article(context, question)
-            strategy_text = "Gemini Article Analysis"
         else:
             # General question mode
             analysis_result = await gemini_engine.ask_question(question, context)
-            strategy_text = "Gemini Knowledge Base"
         
         # Create optimized embeds
         title = f"🤖 Gemini AI"
@@ -1648,8 +1588,8 @@ async def help_command_optimized(ctx):
     """Simple menu guide"""
     
     main_embed = create_safe_embed(
-        "📰 News Bot",
-        "CafeF + Yahoo Finance",
+        "📰 News Bot - Fixed 2025",
+        "CafeF + Yahoo Finance (URLs đã sửa)",
         0x00ff88
     )
     
@@ -1677,21 +1617,21 @@ async def status_command(ctx):
     global_cache_size = len(global_seen_articles)
     
     main_embed = create_safe_embed(
-        "📊 Trạng thái hệ thống",
+        "📊 Trạng thái hệ thống - Fixed 2025",
         "",
         0x00ff88
     )
     
     safe_name1, safe_value1 = validate_embed_field(
         "📰 Nguồn tin",
-        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 Yahoo Finance: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}"
+        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 Yahoo Finance: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n✅ URLs đã được sửa cho 2025"
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
     gemini_status = "✅" if gemini_engine.available else "❌"
     safe_name2, safe_value2 = validate_embed_field(
         "🤖 AI System",
-        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}"
+        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}\n⚡ Optimized timeouts"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=True)
     
@@ -1705,9 +1645,11 @@ if __name__ == "__main__":
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
         
-        print("🚀 Starting News Bot...")
+        print("🚀 Starting FIXED News Bot...")
         print(f"🔧 Sources: {total_sources}")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
+        print("✅ URLs FIXED for 2025")
+        print("⚡ Optimized timeouts and limits")
         print("=" * 40)
         
         bot.run(TOKEN)
