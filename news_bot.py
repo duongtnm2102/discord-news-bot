@@ -325,6 +325,137 @@ def add_random_delay():
     delay = random.uniform(0.3, 1.5)  # Reduced from 0.5-2.0
     time.sleep(delay)
 
+def is_international_source(source_name):
+    """Check if source is international - FIXED for all RSS sources"""
+    international_sources = [
+        'yahoo_finance', 'cnn_money', 'reuters', 'marketwatch', 'business_insider',
+        'forbes', 'wsj', 'cnbc', 'investing_com', 'seekingalpha', 'financial_times',
+        'fortune', 'economist', 'nasdaq', 'washington_post', 'guardian_business',
+        'investopedia', 'nikkei_asia', 'economic_times', 'bbc_news', 'coindesk'
+    ]
+    return any(source in source_name for source in international_sources)
+
+def create_fallback_content(url, source_name, error_msg=""):
+    """Create fallback content when extraction fails - FIXED for all sources"""
+    try:
+        article_id = url.split('/')[-1] if '/' in url else 'news-article'
+        
+        if is_international_source(source_name):
+            # Get actual source display name
+            source_display = "Financial News"
+            if 'marketwatch' in source_name:
+                source_display = "MarketWatch"
+            elif 'reuters' in source_name:
+                source_display = "Reuters"
+            elif 'cnn' in source_name:
+                source_display = "CNN Money"
+            elif 'forbes' in source_name:
+                source_display = "Forbes"
+            elif 'wsj' in source_name:
+                source_display = "Wall Street Journal"
+            elif 'cnbc' in source_name:
+                source_display = "CNBC"
+            elif 'bbc' in source_name:
+                source_display = "BBC News"
+            
+            return f"""**{source_display} Financial News:**
+
+📈 **Market Analysis:** This article provides financial market insights and economic analysis.
+
+📊 **Coverage Areas:**
+• Real-time market data and analysis
+• Economic indicators and trends
+• Corporate earnings and reports
+• Investment strategies and forecasts
+
+**Article ID:** {article_id}
+**Note:** Content extraction failed. Please visit the original link for complete article.
+
+{f'**Technical Error:** {error_msg}' if error_msg else ''}"""
+        else:
+            return f"""**Tin tức kinh tế CafeF:**
+
+📰 **Thông tin kinh tế:** Bài viết cung cấp thông tin kinh tế, tài chính từ CafeF.
+
+📊 **Nội dung chuyên sâu:**
+• Phân tích thị trường chứng khoán Việt Nam
+• Tin tức kinh tế vĩ mô và chính sách
+• Báo cáo doanh nghiệp và tài chính
+• Bất động sản và đầu tư
+
+**Mã bài viết:** {article_id}
+**Lưu ý:** Để đọc đầy đủ, vui lòng truy cập link gốc.
+
+{f'**Lỗi:** {error_msg}' if error_msg else ''}"""
+        
+    except Exception as e:
+        return f"Nội dung từ {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ."
+
+async def extract_content_with_gemini(url, source_name):
+    """Use Gemini to extract and translate content from international news"""
+    try:
+        if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
+            return create_fallback_content(url, source_name, "Gemini không khả dụng")
+        
+        extraction_prompt = f"""You are a financial news content extractor and translator. Access and process this news article:
+
+**ARTICLE URL:** {url}
+
+**INSTRUCTIONS:**
+1. Access and read the COMPLETE article content from the URL
+2. Extract main content (remove ads, sidebar, footer)
+3. Translate from English to Vietnamese naturally and accurately
+4. Preserve all numbers, percentages, company names, financial terms
+5. Use standard Vietnamese economic-financial terminology
+6. Do NOT add personal commentary or explanations
+7. Return translated content with clear structure
+8. FOCUS ONLY on the source article content - do not reference other news sources
+
+**IMPORTANT:** Only return the translated article content from the provided URL. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
+
+**TRANSLATED CONTENT:**"""
+
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            generation_config = genai.types.GenerationConfig(
+                temperature=0.1,
+                top_p=0.8,
+                max_output_tokens=2500,
+            )
+            
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    extraction_prompt,
+                    generation_config=generation_config
+                ),
+                timeout=25
+            )
+            
+            extracted_content = response.text.strip()
+            
+            if len(extracted_content) > 200:
+                error_indicators = [
+                    'cannot access', 'unable to access', 'không thể truy cập',
+                    'failed to retrieve', 'error occurred', 'sorry, i cannot'
+                ]
+                
+                if not any(indicator in extracted_content.lower() for indicator in error_indicators):
+                    return f"[🤖 Gemini AI trích xuất từ {source_name}]\n\n{extracted_content}"
+                else:
+                    return create_fallback_content(url, source_name, "Gemini không thể trích xuất nội dung")
+            else:
+                return create_fallback_content(url, source_name, "Gemini trả về nội dung quá ngắn")
+            
+        except asyncio.TimeoutError:
+            return create_fallback_content(url, source_name, "Gemini timeout")
+        except Exception as e:
+            return create_fallback_content(url, source_name, f"Lỗi Gemini: {str(e)}")
+            
+    except Exception as e:
+        return create_fallback_content(url, source_name, str(e))
+
 # 🆕 OPTIMIZED YAHOO FINANCE NEWS SCRAPING - Fixed for 2025
 def scrape_yahoo_finance_news(base_url, limit=20):  # Reduced limit from 30
     """OPTIMIZED scrape news directly from Yahoo Finance - Fixed URLs 2025"""
@@ -373,22 +504,6 @@ def scrape_yahoo_finance_news(base_url, limit=20):  # Reduced limit from 30
         
         for selector in article_selectors:
             try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
-            generation_config = genai.types.GenerationConfig(
-                temperature=0.1,
-                top_p=0.8,
-                max_output_tokens=2500,
-            )
-            
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    model.generate_content,
-                    extraction_prompt,
-                    generation_config=generation_config
-                ),
-                timeout=25  # Reduced timeout
-            )
                 elements = soup.select(selector)[:limit]  # Limit early
                 for element in elements:
                     try:
@@ -588,67 +703,6 @@ async def extract_content_enhanced(url, source_name, news_item=None):
         print(f"❌ Extract content error for {source_name}: {e}")
         return create_fallback_content(url, source_name, str(e))
 
-# 🆕 GEMINI CONTENT EXTRACTION FOR INTERNATIONAL NEWS
-async def extract_content_with_gemini(url, source_name):
-    """Use Gemini to extract and translate content from international news"""
-    try:
-        if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
-            return create_fallback_content(url, source_name, "Gemini không khả dụng")
-        
-        extraction_prompt = f"""You are a financial news content extractor and translator. Access and process this news article:
-
-**ARTICLE URL:** {url}
-
-**INSTRUCTIONS:**
-1. Access and read the COMPLETE article content from the URL
-2. Extract main content (remove ads, sidebar, footer)
-3. Translate from English to Vietnamese naturally and accurately
-4. Preserve all numbers, percentages, company names, financial terms
-5. Use standard Vietnamese economic-financial terminology
-6. Do NOT add personal commentary or explanations
-7. Return translated content with clear structure
-8. FOCUS ONLY on the source article content - do not reference other news sources
-
-**IMPORTANT:** Only return the translated article content from the provided URL. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
-
-**TRANSLATED CONTENT:**"""
-        
-        try:
-
-        try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
-            generation_config = genai.types.GenerationConfig(
-                temperature=0.1,
-                top_p=0.8,
-                max_output_tokens=2500,
-            )
-            
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    model.generate_content,
-                    extraction_prompt,
-                    generation_config=generation_config
-                ),
-                timeout=25  # Reduced timeout
-            )
-            
-            extracted_content = response.text.strip()
-            
-            # Validate content quality
-            if len(extracted_content) > 200 and 'không thể truy cập' not in extracted_content.lower():
-                return f"[🤖 Gemini đã trích xuất và dịch] {extracted_content}"
-            else:
-                return create_fallback_content(url, source_name, "Gemini không thể trích xuất nội dung")
-            
-        except asyncio.TimeoutError:
-            return create_fallback_content(url, source_name, "Gemini timeout")
-        except Exception as e:
-            return create_fallback_content(url, source_name, f"Lỗi Gemini: {str(e)}")
-            
-    except Exception as e:
-        return create_fallback_content(url, source_name, str(e))
-
 def clean_content_enhanced(content):
     """Enhanced content cleaning for CafeF"""
     if not content:
@@ -673,72 +727,6 @@ def clean_content_enhanced(content):
     content = re.sub(r'\n\s*\n', '\n', content)
     
     return content.strip()
-
-def is_international_source(source_name):
-    """Check if source is international - FIXED for all RSS sources"""
-    international_sources = [
-        'yahoo_finance', 'cnn_money', 'reuters', 'marketwatch', 'business_insider',
-        'forbes', 'wsj', 'cnbc', 'investing_com', 'seekingalpha', 'financial_times',
-        'fortune', 'economist', 'nasdaq', 'washington_post', 'guardian_business',
-        'investopedia', 'nikkei_asia', 'economic_times', 'bbc_news', 'coindesk'
-    ]
-    return any(source in source_name for source in international_sources)
-
-def create_fallback_content(url, source_name, error_msg=""):
-    """Create fallback content when extraction fails - FIXED for all sources"""
-    try:
-        article_id = url.split('/')[-1] if '/' in url else 'news-article'
-        
-        if is_international_source(source_name):
-            # Get actual source display name
-            source_display = "Financial News"
-            if 'marketwatch' in source_name:
-                source_display = "MarketWatch"
-            elif 'reuters' in source_name:
-                source_display = "Reuters"
-            elif 'cnn' in source_name:
-                source_display = "CNN Money"
-            elif 'forbes' in source_name:
-                source_display = "Forbes"
-            elif 'wsj' in source_name:
-                source_display = "Wall Street Journal"
-            elif 'cnbc' in source_name:
-                source_display = "CNBC"
-            elif 'bbc' in source_name:
-                source_display = "BBC News"
-            
-            return f"""**{source_display} Financial News:**
-
-📈 **Market Analysis:** This article provides financial market insights and economic analysis.
-
-📊 **Coverage Areas:**
-• Real-time market data and analysis
-• Economic indicators and trends
-• Corporate earnings and reports
-• Investment strategies and forecasts
-
-**Article ID:** {article_id}
-**Note:** Content extraction failed. Please visit the original link for complete article.
-
-{f'**Technical Error:** {error_msg}' if error_msg else ''}"""
-        else:
-            return f"""**Tin tức kinh tế CafeF:**
-
-📰 **Thông tin kinh tế:** Bài viết cung cấp thông tin kinh tế, tài chính từ CafeF.
-
-📊 **Nội dung chuyên sâu:**
-• Phân tích thị trường chứng khoán Việt Nam
-• Tin tức kinh tế vĩ mô và chính sách
-• Báo cáo doanh nghiệp và tài chính
-• Bất động sản và đầu tư
-
-**Mã bài viết:** {article_id}
-**Lưu ý:** Để đọc đầy đủ, vui lòng truy cập link gốc.
-
-{f'**Lỗi:** {error_msg}' if error_msg else ''}"""
-        
-    except Exception as e:
-        return f"Nội dung từ {source_name}. Vui lòng truy cập link gốc để đọc đầy đủ."
 
 # 🚀 OPTIMIZED NEWS COLLECTION - Reduced limits to prevent timeout
 async def collect_news_enhanced(sources_dict, limit_per_source=20):  # Reduced from 50
@@ -1381,7 +1369,7 @@ async def get_international_news_enhanced(ctx, page=1):
         for i, news in enumerate(page_news, 1):
             emoji = emoji_map.get(news['source'], '💰')
             title = news['title'][:50] + "..." if len(news['title']) > 50 else news['title']
-            source_display = source_names.get(news['source'], 'Yahoo Finance')
+            source_display = source_names.get(news['source'], 'International Finance')
             
             field_name = f"{i}. {emoji} {title}"
             field_value = f"🕰️ {news['published_str']} • 📰 {source_display}\n🔗 [Đọc bài viết]({news['link']})"
@@ -1510,7 +1498,9 @@ async def get_news_detail_enhanced(ctx, news_number: int):
             'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
             'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
             'yahoo_finance_main': 'Yahoo Finance RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_scraped': 'Yahoo Finance Scraped'
+            'yahoo_finance_scraped': 'Yahoo Finance Scraped', 'marketwatch': 'MarketWatch',
+            'reuters_topnews': 'Reuters', 'cnn_money': 'CNN Money', 'forbes': 'Forbes',
+            'wsj': 'Wall Street Journal', 'cnbc': 'CNBC', 'bbc_news': 'BBC News'
         }
         
         source_name = source_names.get(news['source'], news['source'])
