@@ -128,20 +128,17 @@ RSS_FEEDS = {
         
         # ✅ FREE NEWS RSS FEEDS (NO PAYWALL - Verified 2025)
         'cnn_money': 'http://rss.cnn.com/rss/money_topstories.rss',
-        'reuters_topnews': 'http://feeds.reuters.com/reuters/topNews',
-        'reuters_business': 'http://feeds.reuters.com/reuters/businessNews',
         'marketwatch': 'http://feeds.marketwatch.com/marketwatch/topstories/',
         'business_insider': 'http://feeds2.feedburner.com/businessinsider',
         'cnbc': 'https://www.cnbc.com/id/100003114/device/rss/rss.html',
         'investing_com': 'https://www.investing.com/rss/news.rss',
         'investopedia': 'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',
-        'economic_times': 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',
         'bbc_business': 'http://feeds.bbci.co.uk/news/business/rss.xml',
         'guardian_business': 'https://www.theguardian.com/business/economics/rss',
         'coindesk': 'https://feeds.feedburner.com/CoinDesk',
         'nasdaq_news': 'http://articlefeeds.nasdaq.com/nasdaq/categories?category=Investing+Ideas',
         
-        # ✅ FREE ALTERNATIVE SOURCES
+        # ✅ FREE ALTERNATIVE SOURCES (Removed problematic ones)
         'seeking_alpha': 'https://seekingalpha.com/feed.xml',
         'benzinga': 'https://www.benzinga.com/feed',
     }
@@ -169,34 +166,39 @@ def is_duplicate_article(news_item, source_name):
     """Check if article is duplicate using multiple methods"""
     global global_seen_articles
     
-    article_hash = generate_article_hash(news_item['title'], news_item['link'], news_item.get('description', ''))
-    
-    if article_hash in global_seen_articles:
-        return True
-    
-    title_words = set(news_item['title'].lower().split())
-    
-    for existing_hash, existing_data in global_seen_articles.items():
-        existing_title_words = set(existing_data['title'].lower().split())
+    try:
+        article_hash = generate_article_hash(news_item['title'], news_item['link'], news_item.get('description', ''))
         
-        if len(title_words) > 3 and len(existing_title_words) > 3:
-            similarity = len(title_words.intersection(existing_title_words)) / len(title_words.union(existing_title_words))
-            if similarity > 0.8:
-                return True
-    
-    global_seen_articles[article_hash] = {
-        'title': news_item['title'],
-        'link': news_item['link'],
-        'source': source_name,
-        'timestamp': get_current_vietnam_datetime()
-    }
-    
-    if len(global_seen_articles) > MAX_GLOBAL_CACHE:
-        sorted_items = sorted(global_seen_articles.items(), key=lambda x: x[1]['timestamp'])
-        for old_hash, _ in sorted_items[:100]:
-            del global_seen_articles[old_hash]
-    
-    return False
+        if article_hash in global_seen_articles:
+            return True
+        
+        title_words = set(news_item['title'].lower().split())
+        
+        for existing_hash, existing_data in list(global_seen_articles.items()):  # Convert to list to avoid runtime errors
+            existing_title_words = set(existing_data['title'].lower().split())
+            
+            if len(title_words) > 3 and len(existing_title_words) > 3:
+                similarity = len(title_words.intersection(existing_title_words)) / len(title_words.union(existing_title_words))
+                if similarity > 0.8:
+                    return True
+        
+        global_seen_articles[article_hash] = {
+            'title': news_item['title'],
+            'link': news_item['link'],
+            'source': source_name,
+            'timestamp': get_current_vietnam_datetime()
+        }
+        
+        if len(global_seen_articles) > MAX_GLOBAL_CACHE:
+            sorted_items = sorted(global_seen_articles.items(), key=lambda x: x[1]['timestamp'])
+            for old_hash, _ in sorted_items[:100]:
+                del global_seen_articles[old_hash]
+        
+        return False
+        
+    except Exception as e:
+        print(f"⚠️ Duplicate check error: {e}")
+        return False
 
 # 🔧 CONTENT VALIDATION FOR DISCORD
 def validate_and_truncate_content(content: str, limit: int, suffix: str = "...") -> str:
@@ -250,14 +252,14 @@ async def async_sleep_delay():
     await asyncio.sleep(delay)
 
 def get_enhanced_headers(url=None):
-    """Enhanced headers for better compatibility"""
+    """Enhanced headers for better compatibility - NO BROTLI"""
     user_agent = random.choice(USER_AGENTS)
     
     headers = {
         'User-Agent': user_agent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Encoding': 'gzip, deflate',  # Removed 'br' to avoid brotli errors
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'DNT': '1',
@@ -279,10 +281,10 @@ def get_enhanced_headers(url=None):
     return headers
 
 def is_international_source(source_name):
-    """Check if source is international"""
+    """Check if source is international - FIXED for removed sources"""
     international_sources = [
-        'yahoo_finance', 'cnn_money', 'reuters', 'marketwatch', 'business_insider',
-        'cnbc', 'investing_com', 'investopedia', 'economic_times', 'bbc_business',
+        'yahoo_finance', 'cnn_money', 'marketwatch', 'business_insider',
+        'cnbc', 'investing_com', 'investopedia', 'bbc_business',
         'guardian_business', 'coindesk', 'nasdaq_news', 'seeking_alpha', 'benzinga'
     ]
     return any(source in source_name for source in international_sources)
@@ -870,33 +872,76 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
         except Exception as e:
             return f"⚠️ Lỗi Gemini AI: {str(e)}"
     
+    async def debate_perspectives(self, topic: str):
+        """Multi-perspective debate system"""
+        if not self.available:
+            return "⚠️ Gemini AI không khả dụng."
+        
+        try:
+            prompt = f"""Tổ chức cuộc tranh luận về: {topic}
+
+6 quan điểm khác nhau:
+💸 **Nhà KT Tham Nhũng:** [ích kỷ, bóp méo số liệu]
+👨‍🏫 **GS Chính Trực:** [học thuật, đạo đức cao]  
+💼 **Nhân Viên Ham Tiền:** [chỉ quan tâm lương]
+😠 **Người Nghèo:** [đổ lỗi, thiếu hiểu biết]
+🤑 **Người Giàu Ích Kỷ:** [chỉ tìm lợi nhuận]
+🧠 **Người Giàu Thông Thái:** [tầm nhìn xa]
+🤖 **Tổng Kết:** [phân tích khách quan]
+
+Mỗi góc nhìn 80-120 từ, thể hiện rõ tính cách:"""
+
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            generation_config = genai.types.GenerationConfig(
+                temperature=0.4,
+                top_p=0.9,
+                max_output_tokens=1500,
+            )
+            
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    prompt,
+                    generation_config=generation_config
+                ),
+                timeout=20
+            )
+            
+            return response.text.strip()
+            
+        except asyncio.TimeoutError:
+            return "⚠️ Gemini AI timeout."
+        except Exception as e:
+            return f"⚠️ Lỗi Gemini AI: {str(e)}"
+    
     async def analyze_article(self, article_content: str, question: str = ""):
-        """Analyze specific article with Gemini"""
+        """Analyze specific article with Gemini - Vietnamese response"""
         if not self.available:
             return "⚠️ Gemini AI không khả dụng cho phân tích bài báo."
         
         try:
             analysis_question = question if question else "Hãy phân tích và tóm tắt bài báo này"
             
-            prompt = f"""You are Gemini AI - an intelligent financial economics expert. Analyze the article based on the COMPLETE content provided.
+            prompt = f"""Bạn là Gemini AI - chuyên gia kinh tế tài chính thông minh. Hãy phân tích bài báo dựa trên NỘI DUNG HOÀN CHỈNH được cung cấp.
 
-**COMPLETE ARTICLE CONTENT:**
+**NỘI DUNG BÀI BÁO HOÀN CHỈNH:**
 {article_content}
 
-**ANALYSIS REQUEST:**
+**YÊU CẦU PHÂN TÍCH:**
 {analysis_question}
 
-**ANALYSIS GUIDELINES:**
-1. Base analysis PRIMARILY on the article content (85-90%)
-2. Combine with professional knowledge for deeper explanation (10-15%)
-3. Analyze impact, causes, consequences
-4. Provide insights and in-depth assessments
-5. Answer questions directly with evidence from the article
-6. Length: 600-1000 words with clear structure
-7. Reference specific parts of the article
-8. ONLY analyze the provided article - do not reference other news sources unless mentioned in the original
+**HƯỚNG DẪN PHÂN TÍCH:**
+1. Phân tích CHỦ YẾU dựa trên nội dung bài báo (85-90%)
+2. Kết hợp kiến thức chuyên môn để giải thích sâu hơn (10-15%)
+3. Phân tích tác động, nguyên nhân, hậu quả
+4. Đưa ra nhận định và đánh giá chuyên sâu
+5. Trả lời câu hỏi trực tiếp với bằng chứng từ bài báo
+6. Độ dài: 600-1000 từ với cấu trúc rõ ràng
+7. Tham chiếu các phần cụ thể trong bài báo
+8. CHỈ phân tích bài báo được cung cấp
 
-**IMPORTANT:** Focus solely on the content from the provided article. Provide INTELLIGENT and DETAILED analysis:"""
+**QUAN TRỌNG:** Tập trung hoàn toàn vào nội dung từ bài báo đã cung cấp. Đưa ra phân tích THÔNG MINH và CHI TIẾT bằng tiếng Việt:"""
 
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
             
@@ -1015,11 +1060,10 @@ async def get_all_news_enhanced(ctx, page=1):
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
             
-            # FREE international sources
+            # FREE international sources - FIXED mapping
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
-            'cnn_money': '📺', 'reuters_topnews': '🌍', 'reuters_business': '🌍',
-            'marketwatch': '📊', 'business_insider': '💼', 'cnbc': '📺', 
-            'investing_com': '💹', 'investopedia': '📚', 'economic_times': '🇮🇳',
+            'cnn_money': '📺', 'marketwatch': '📊', 'business_insider': '💼', 
+            'cnbc': '📺', 'investing_com': '💹', 'investopedia': '📚',
             'bbc_business': '🇬🇧', 'guardian_business': '🛡️', 'coindesk': '₿',
             'nasdaq_news': '📈', 'seeking_alpha': '🔍', 'benzinga': '🚀'
         }
@@ -1084,24 +1128,21 @@ async def get_international_news_enhanced(ctx, page=1):
         stats_field = f"🌍 {len(news_list)} tin"
         fields_data.append(("📊", stats_field))
         
-        # FREE source names only
+        # FREE source names only - FIXED
         source_names = {
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
             'yahoo_finance_rss': 'Yahoo Finance', 'cnn_money': 'CNN Money', 
-            'reuters_topnews': 'Reuters', 'reuters_business': 'Reuters Business',
             'marketwatch': 'MarketWatch', 'business_insider': 'Business Insider',
             'cnbc': 'CNBC', 'investing_com': 'Investing.com', 
-            'investopedia': 'Investopedia', 'economic_times': 'Economic Times',
-            'bbc_business': 'BBC Business', 'guardian_business': 'The Guardian',
-            'coindesk': 'CoinDesk', 'nasdaq_news': 'Nasdaq',
-            'seeking_alpha': 'Seeking Alpha', 'benzinga': 'Benzinga'
+            'investopedia': 'Investopedia', 'bbc_business': 'BBC Business', 
+            'guardian_business': 'The Guardian', 'coindesk': 'CoinDesk', 
+            'nasdaq_news': 'Nasdaq', 'seeking_alpha': 'Seeking Alpha', 'benzinga': 'Benzinga'
         }
         
         emoji_map = {
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
-            'cnn_money': '📺', 'reuters_topnews': '🌍', 'reuters_business': '🌍',
-            'marketwatch': '📊', 'business_insider': '💼', 'cnbc': '📺', 
-            'investing_com': '💹', 'investopedia': '📚', 'economic_times': '🇮🇳',
+            'cnn_money': '📺', 'marketwatch': '📊', 'business_insider': '💼', 
+            'cnbc': '📺', 'investing_com': '💹', 'investopedia': '📚',
             'bbc_business': '🇬🇧', 'guardian_business': '🛡️', 'coindesk': '₿',
             'nasdaq_news': '📈', 'seeking_alpha': '🔍', 'benzinga': '🚀'
         }
@@ -1224,12 +1265,12 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Save as last detail for !hoi context
         save_user_last_detail(user_id, news)
         
-        # Source names mapping
+        # Source names mapping - FIXED
         source_names = {
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'marketwatch': 'MarketWatch', 'reuters_topnews': 'Reuters', 'cnn_money': 'CNN Money',
+            'marketwatch': 'MarketWatch', 'cnn_money': 'CNN Money',
             'cnbc': 'CNBC', 'bbc_business': 'BBC Business', 'investing_com': 'Investing.com'
         }
         
