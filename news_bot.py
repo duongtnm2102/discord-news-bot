@@ -1,12 +1,10 @@
 import discord
 from discord.ext import commands
 import feedparser
-import requests
 import asyncio
 import os
 import re
 from datetime import datetime, timedelta
-import time
 import calendar
 from urllib.parse import urljoin, urlparse, quote
 import html
@@ -20,7 +18,7 @@ from typing import List, Dict, Tuple, Optional
 import random
 import hashlib
 
-# 🚀 OPTIMIZED LIBRARIES - Enhanced for Yahoo Finance
+# 🚀 OPTIMIZED LIBRARIES - Enhanced for async operations
 try:
     import trafilatura
     TRAFILATURA_AVAILABLE = True
@@ -40,12 +38,6 @@ try:
 except ImportError:
     BEAUTIFULSOUP_AVAILABLE = False
 
-try:
-    import wikipedia
-    WIKIPEDIA_AVAILABLE = True
-except ImportError:
-    WIKIPEDIA_AVAILABLE = False
-
 # 🆕 GEMINI ONLY - Enhanced AI System with Direct Content Access
 try:
     import google.generativeai as genai
@@ -61,8 +53,6 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # 🔒 ENVIRONMENT VARIABLES
 TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-GOOGLE_CSE_ID = os.getenv('GOOGLE_CSE_ID')
 
 # 🔧 TIMEZONE - Vietnam
 VN_TIMEZONE = pytz.timezone('Asia/Ho_Chi_Minh')
@@ -78,11 +68,10 @@ DISCORD_EMBED_TOTAL_EMBED_LIMIT = 5800
 user_news_cache = {}
 user_last_detail_cache = {}
 global_seen_articles = {}  # Global deduplication cache
-scraped_news_cache = {}    # Cache for scraped news from Yahoo Finance
 MAX_CACHE_ENTRIES = 25
 MAX_GLOBAL_CACHE = 1000
 
-# 🔧 Enhanced User Agents for Yahoo Finance
+# 🔧 Enhanced User Agents for better compatibility
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
@@ -110,7 +99,7 @@ def get_current_datetime_str():
     current_dt = get_current_vietnam_datetime()
     return current_dt.strftime("%H:%M %d/%m/%Y")
 
-print("🚀 NEWS BOT:")
+print("🚀 ENHANCED NEWS BOT:")
 print(f"DISCORD_TOKEN: {'✅' if TOKEN else '❌'}")
 print(f"GEMINI_API_KEY: {'✅' if GEMINI_API_KEY else '❌'}")
 print("=" * 30)
@@ -119,7 +108,7 @@ if not TOKEN:
     print("❌ CRITICAL: DISCORD_TOKEN not found!")
     exit(1)
 
-# 🔧 MASSIVE RSS FEEDS - 20+ WORKING SOURCES from GitHub Gist 2025
+# 🔧 FREE RSS FEEDS ONLY - Removed ALL Paywall Sources 2025
 RSS_FEEDS = {
     # === KINH TẾ TRONG NƯỚC - CHỈ CAFEF ===
     'domestic': {
@@ -130,39 +119,31 @@ RSS_FEEDS = {
         'cafef_doanhnghiep': 'https://cafef.vn/doanh-nghiep.rss'
     },
     
-    # === QUỐC TẾ - MASSIVE RSS COLLECTION from GitHub Gist 2025 ===
+    # === QUỐC TẾ - ONLY FREE RSS SOURCES (NO PAYWALL) ===
     'international': {
-        # ✅ YAHOO FINANCE RSS (Original working feeds)
+        # ✅ YAHOO FINANCE RSS (100% Free)
         'yahoo_finance_main': 'https://finance.yahoo.com/news/rssindex',
         'yahoo_finance_headlines': 'https://feeds.finance.yahoo.com/rss/2.0/headline',
         'yahoo_finance_rss': 'https://www.yahoo.com/news/rss/finance',
         
-        # ✅ MAJOR FINANCIAL NEWS RSS FEEDS (Verified from GitHub)
+        # ✅ FREE NEWS RSS FEEDS (NO PAYWALL - Verified 2025)
         'cnn_money': 'http://rss.cnn.com/rss/money_topstories.rss',
         'reuters_topnews': 'http://feeds.reuters.com/reuters/topNews',
+        'reuters_business': 'http://feeds.reuters.com/reuters/businessNews',
         'marketwatch': 'http://feeds.marketwatch.com/marketwatch/topstories/',
         'business_insider': 'http://feeds2.feedburner.com/businessinsider',
-        'forbes': 'https://www.forbes.com/real-time/feed2/',
-        'wsj': 'http://www.wsj.com/xml/rss/3_7031.xml',
         'cnbc': 'https://www.cnbc.com/id/100003114/device/rss/rss.html',
         'investing_com': 'https://www.investing.com/rss/news.rss',
-        'seekingalpha': 'https://seekingalpha.com/market_currents.xml',
-        'financial_times': 'https://www.ft.com/?format=rss',
-        'fortune': 'http://fortune.com/feed/',
-        'economist': 'http://www.economist.com/sections/economics/rss.xml',
-        'nasdaq': 'http://articlefeeds.nasdaq.com/nasdaq/categories?category=Investing+Ideas',
-        'washington_post_biz': 'http://feeds.washingtonpost.com/rss/business',
-        'guardian_business': 'https://www.theguardian.com/business/economics/rss',
         'investopedia': 'https://www.investopedia.com/feedbuilder/feed/getfeed/?feedName=rss_headline',
-        'nikkei_asia': 'https://asia.nikkei.com/rss/feed/nar',
         'economic_times': 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',
-        'bbc_news': 'http://feeds.bbci.co.uk/news/rss.xml',
+        'bbc_business': 'http://feeds.bbci.co.uk/news/business/rss.xml',
+        'guardian_business': 'https://www.theguardian.com/business/economics/rss',
         'coindesk': 'https://feeds.feedburner.com/CoinDesk',
+        'nasdaq_news': 'http://articlefeeds.nasdaq.com/nasdaq/categories?category=Investing+Ideas',
         
-        # ✅ BACKUP WORKING URLs (if primary fail)
-        'yahoo_finance_crypto': 'https://finance.yahoo.com/topic/crypto/',
-        'yahoo_finance_tech': 'https://finance.yahoo.com/topic/tech/',
-        'yahoo_finance_stock_market': 'https://finance.yahoo.com/topic/stock-market-news/',
+        # ✅ FREE ALTERNATIVE SOURCES
+        'seeking_alpha': 'https://seekingalpha.com/feed.xml',
+        'benzinga': 'https://www.benzinga.com/feed',
     }
 }
 
@@ -179,11 +160,8 @@ def convert_utc_to_vietnam_time(utc_time_tuple):
 # 🆕 ENHANCED DEDUPLICATION SYSTEM
 def generate_article_hash(title, link, description=""):
     """Generate unique hash for article deduplication"""
-    # Clean and normalize text
     clean_title = re.sub(r'[^\w\s]', '', title.lower().strip())
     clean_link = link.lower().strip()
-    
-    # Create content-based hash
     content = f"{clean_title}|{clean_link}"
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
@@ -191,30 +169,21 @@ def is_duplicate_article(news_item, source_name):
     """Check if article is duplicate using multiple methods"""
     global global_seen_articles
     
-    # Method 1: Hash-based deduplication
     article_hash = generate_article_hash(news_item['title'], news_item['link'], news_item.get('description', ''))
     
     if article_hash in global_seen_articles:
         return True
     
-    # Method 2: Title similarity check (for same-content different URLs)
     title_words = set(news_item['title'].lower().split())
     
     for existing_hash, existing_data in global_seen_articles.items():
         existing_title_words = set(existing_data['title'].lower().split())
         
-        # Check if 80% of words are similar
         if len(title_words) > 3 and len(existing_title_words) > 3:
             similarity = len(title_words.intersection(existing_title_words)) / len(title_words.union(existing_title_words))
             if similarity > 0.8:
                 return True
     
-    # Method 3: URL domain check (same article, different parameters)
-    for existing_hash, existing_data in global_seen_articles.items():
-        if clean_url_for_comparison(news_item['link']) == clean_url_for_comparison(existing_data['link']):
-            return True
-    
-    # Not duplicate - add to cache
     global_seen_articles[article_hash] = {
         'title': news_item['title'],
         'link': news_item['link'],
@@ -222,23 +191,12 @@ def is_duplicate_article(news_item, source_name):
         'timestamp': get_current_vietnam_datetime()
     }
     
-    # Limit cache size
     if len(global_seen_articles) > MAX_GLOBAL_CACHE:
-        # Remove oldest 100 entries
         sorted_items = sorted(global_seen_articles.items(), key=lambda x: x[1]['timestamp'])
         for old_hash, _ in sorted_items[:100]:
             del global_seen_articles[old_hash]
     
     return False
-
-def clean_url_for_comparison(url):
-    """Clean URL for comparison (remove parameters, fragments)"""
-    try:
-        from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(url)
-        return f"{parsed.netloc}{parsed.path}".lower()
-    except:
-        return url.lower()
 
 # 🔧 CONTENT VALIDATION FOR DISCORD
 def validate_and_truncate_content(content: str, limit: int, suffix: str = "...") -> str:
@@ -285,9 +243,14 @@ def create_safe_embed(title: str, description: str = "", color: int = 0x00ff88) 
         timestamp=get_current_vietnam_datetime()
     )
 
-# 🔧 Enhanced headers with retry mechanism - OPTIMIZED for 2025
+# 🔧 ASYNC-FIRST APPROACHES - NO MORE BLOCKING
+async def async_sleep_delay():
+    """FIXED: Use asyncio.sleep instead of time.sleep to prevent heartbeat blocking"""
+    delay = random.uniform(0.1, 0.5)  # Much shorter delay
+    await asyncio.sleep(delay)
+
 def get_enhanced_headers(url=None):
-    """Enhanced headers for Yahoo Finance with anti-blocking - OPTIMIZED"""
+    """Enhanced headers for better compatibility"""
     user_agent = random.choice(USER_AGENTS)
     
     headers = {
@@ -300,17 +263,12 @@ def get_enhanced_headers(url=None):
         'DNT': '1',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-User': '?1',
-        'Sec-Fetch-Dest': 'document'
     }
     
     if url and 'yahoo' in url.lower():
         headers.update({
             'Referer': 'https://finance.yahoo.com/',
             'Origin': 'https://finance.yahoo.com',
-            'Host': 'finance.yahoo.com' if 'finance.yahoo.com' in url else 'feeds.finance.yahoo.com'
         })
     elif url and 'cafef.vn' in url.lower():
         headers.update({
@@ -320,28 +278,21 @@ def get_enhanced_headers(url=None):
     
     return headers
 
-def add_random_delay():
-    """Add random delay to avoid rate limiting - SHORTER for optimization"""
-    delay = random.uniform(0.3, 1.5)  # Reduced from 0.5-2.0
-    time.sleep(delay)
-
 def is_international_source(source_name):
-    """Check if source is international - FIXED for all RSS sources"""
+    """Check if source is international"""
     international_sources = [
         'yahoo_finance', 'cnn_money', 'reuters', 'marketwatch', 'business_insider',
-        'forbes', 'wsj', 'cnbc', 'investing_com', 'seekingalpha', 'financial_times',
-        'fortune', 'economist', 'nasdaq', 'washington_post', 'guardian_business',
-        'investopedia', 'nikkei_asia', 'economic_times', 'bbc_news', 'coindesk'
+        'cnbc', 'investing_com', 'investopedia', 'economic_times', 'bbc_business',
+        'guardian_business', 'coindesk', 'nasdaq_news', 'seeking_alpha', 'benzinga'
     ]
     return any(source in source_name for source in international_sources)
 
 def create_fallback_content(url, source_name, error_msg=""):
-    """Create fallback content when extraction fails - FIXED for all sources"""
+    """Create fallback content when extraction fails"""
     try:
         article_id = url.split('/')[-1] if '/' in url else 'news-article'
         
         if is_international_source(source_name):
-            # Get actual source display name
             source_display = "Financial News"
             if 'marketwatch' in source_name:
                 source_display = "MarketWatch"
@@ -349,14 +300,10 @@ def create_fallback_content(url, source_name, error_msg=""):
                 source_display = "Reuters"
             elif 'cnn' in source_name:
                 source_display = "CNN Money"
-            elif 'forbes' in source_name:
-                source_display = "Forbes"
-            elif 'wsj' in source_name:
-                source_display = "Wall Street Journal"
             elif 'cnbc' in source_name:
                 source_display = "CNBC"
             elif 'bbc' in source_name:
-                source_display = "BBC News"
+                source_display = "BBC Business"
             
             return f"""**{source_display} Financial News:**
 
@@ -397,21 +344,25 @@ async def extract_content_with_gemini(url, source_name):
         if not GEMINI_API_KEY or not GEMINI_AVAILABLE:
             return create_fallback_content(url, source_name, "Gemini không khả dụng")
         
-        extraction_prompt = f"""You are a financial news content extractor and translator. Access and process this news article:
+        extraction_prompt = f"""You are a financial news content extractor and translator. Please read and analyze this news article:
 
 **ARTICLE URL:** {url}
 
 **INSTRUCTIONS:**
-1. Access and read the COMPLETE article content from the URL
-2. Extract main content (remove ads, sidebar, footer)
-3. Translate from English to Vietnamese naturally and accurately
+1. Read and understand the complete article content
+2. Extract the main news information and key facts
+3. Translate the content from English to Vietnamese naturally
 4. Preserve all numbers, percentages, company names, financial terms
 5. Use standard Vietnamese economic-financial terminology
-6. Do NOT add personal commentary or explanations
-7. Return translated content with clear structure
-8. FOCUS ONLY on the source article content - do not reference other news sources
+6. Return ONLY the translated article content
+7. Focus on factual reporting, avoid speculation
 
-**IMPORTANT:** Only return the translated article content from the provided URL. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
+**IMPORTANT REQUIREMENTS:**
+- Only translate the actual article content
+- Do not add commentary or personal opinions
+- Keep all financial data and company names accurate
+- Use proper Vietnamese grammar and structure
+- Length: 300-800 words depending on original content
 
 **TRANSLATED CONTENT:**"""
 
@@ -421,7 +372,7 @@ async def extract_content_with_gemini(url, source_name):
             generation_config = genai.types.GenerationConfig(
                 temperature=0.1,
                 top_p=0.8,
-                max_output_tokens=2500,
+                max_output_tokens=2000,
             )
             
             response = await asyncio.wait_for(
@@ -430,7 +381,7 @@ async def extract_content_with_gemini(url, source_name):
                     extraction_prompt,
                     generation_config=generation_config
                 ),
-                timeout=25
+                timeout=20
             )
             
             extracted_content = response.text.strip()
@@ -456,175 +407,49 @@ async def extract_content_with_gemini(url, source_name):
     except Exception as e:
         return create_fallback_content(url, source_name, str(e))
 
-# 🆕 OPTIMIZED YAHOO FINANCE NEWS SCRAPING - Fixed for 2025
-def scrape_yahoo_finance_news(base_url, limit=20):  # Reduced limit from 30
-    """OPTIMIZED scrape news directly from Yahoo Finance - Fixed URLs 2025"""
+# 🚀 ASYNC HTTP CLIENT - NO MORE BLOCKING REQUESTS
+async def fetch_with_aiohttp(url, headers=None, timeout=8):
+    """FIXED: Use aiohttp instead of requests to prevent blocking"""
     try:
-        print(f"🔄 Optimized scraping: {base_url}")
-        add_random_delay()
+        if headers is None:
+            headers = get_enhanced_headers(url)
         
-        session = requests.Session()
-        headers = get_enhanced_headers(base_url)
-        session.headers.update(headers)
+        timeout_config = aiohttp.ClientTimeout(total=timeout)
         
-        # SHORTER timeout to prevent heartbeat blocking
-        response = session.get(base_url, timeout=10, allow_redirects=True)  # Reduced from 15
-        
-        if response.status_code != 200:
-            print(f"❌ Failed to scrape {base_url}: {response.status_code}")
-            return []
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # OPTIMIZED selectors for Yahoo Finance 2025
-        news_articles = []
-        
-        # Enhanced selectors for different Yahoo Finance page types
-        article_selectors = [
-            # News page selectors
-            'h3 > a[href*="/news/"]',
-            'a[href*="/news/"][data-module]',
-            'h3 a[href*="/news/"]',
-            'h2 a[href*="/news/"]',
-            
-            # Sector page selectors
-            'div[data-testid] a[href*="/quote/"]',
-            '.js-content-viewer a',
-            'article a[href*="/news/"]',
-            
-            # Video page selectors
-            'a[href*="/video/"]',
-            
-            # General news selectors
-            'h3 a',
-            'h2 a',
-            '.newsItem a',
-            '.story a'
-        ]
-        
-        for selector in article_selectors:
-            try:
-                elements = soup.select(selector)[:limit]  # Limit early
-                for element in elements:
-                    try:
-                        # Extract title and link
-                        if element.name == 'a':
-                            title = element.get_text(strip=True)
-                            link = element.get('href', '')
-                        else:
-                            # If it's h3 or other element, find the link inside
-                            link_elem = element.find('a') if element.name != 'a' else element
-                            if not link_elem:
-                                continue
-                            title = link_elem.get_text(strip=True)
-                            link = link_elem.get('href', '')
-                        
-                        # Clean and validate
-                        if not title or not link or len(title) < 10:
-                            continue
-                        
-                        # Fix relative URLs
-                        if link.startswith('/'):
-                            link = f"https://finance.yahoo.com{link}"
-                        elif not link.startswith('http'):
-                            continue
-                        
-                        # Filter for financial/economic content - RELAXED filter
-                        if is_relevant_financial_news_relaxed(title):
-                            news_item = {
-                                'title': html.unescape(title.strip()),
-                                'link': link,
-                                'source': f"yahoo_finance_scraped",
-                                'published': get_current_vietnam_datetime(),
-                                'published_str': get_current_vietnam_datetime().strftime("%H:%M %d/%m"),
-                                'description': title[:200] + "..." if len(title) > 200 else title
-                            }
-                            
-                            # Check for duplicates
-                            if not is_duplicate_article(news_item, news_item['source']):
-                                news_articles.append(news_item)
-                        
-                    except Exception as e:
-                        continue
-                
-                if len(news_articles) >= limit:
-                    break
-                    
-            except Exception as e:
-                continue
-        
-        session.close()
-        print(f"✅ Scraped {len(news_articles)} unique articles from {base_url}")
-        return news_articles[:limit]
-        
+        async with aiohttp.ClientSession(timeout=timeout_config, headers=headers) as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    content = await response.read()
+                    return content
+                else:
+                    return None
     except Exception as e:
-        print(f"❌ Scraping error for {base_url}: {e}")
-        return []
+        print(f"❌ aiohttp fetch error for {url}: {e}")
+        return None
 
-def is_relevant_financial_news_relaxed(title):
-    """RELAXED filter for relevant financial/economic news - More inclusive"""
-    financial_keywords = [
-        # Core financial terms
-        'stock', 'market', 'trading', 'investment', 'investor', 'wall street',
-        'nasdaq', 'dow', 's&p', 'earnings', 'revenue', 'profit', 'loss',
-        'financial', 'finance', 'economy', 'economic', 'fed', 'federal reserve',
-        'interest rate', 'inflation', 'gdp', 'unemployment', 'jobs', 'employment',
-        
-        # Crypto and digital assets
-        'bitcoin', 'crypto', 'cryptocurrency', 'ethereum', 'digital asset',
-        
-        # Banking and financial services
-        'bank', 'banking', 'credit', 'loan', 'mortgage', 'debt',
-        'ipo', 'merger', 'acquisition', 'dividend', 'bond', 'treasury',
-        
-        # Commodities and currencies
-        'currency', 'dollar', 'euro', 'commodity', 'oil', 'gold', 'silver',
-        
-        # Real estate and housing
-        'real estate', 'housing', 'property', 'reit',
-        
-        # Business and corporate
-        'retail', 'consumer', 'spending', 'sales', 'manufacturing', 'industrial',
-        'tech', 'technology', 'ai', 'artificial intelligence', 'startup',
-        'venture capital', 'hedge fund', 'mutual fund', 'etf', 'pension',
-        
-        # Economic indicators
-        'tariff', 'trade', 'export', 'import', 'growth', 'recession',
-        'bull market', 'bear market', 'volatility',
-        
-        # Company names and sectors
-        'apple', 'microsoft', 'google', 'amazon', 'tesla', 'nvidia',
-        'jp morgan', 'goldman sachs', 'berkshire'
-    ]
-    
-    title_lower = title.lower()
-    return any(keyword in title_lower for keyword in financial_keywords)
-
-# 🚀 ENHANCED CONTENT EXTRACTION - USE GEMINI FOR ALL INTERNATIONAL SOURCES
+# 🚀 ASYNC CONTENT EXTRACTION - Non-blocking
 async def extract_content_enhanced(url, source_name, news_item=None):
-    """Enhanced content extraction - Gemini for ALL international sources"""
+    """Enhanced content extraction - Gemini for international, traditional for domestic"""
     
-    # For ALL international sources, use Gemini (not just Yahoo Finance)
+    # For international sources, use Gemini
     if is_international_source(source_name):
         print(f"🤖 Using Gemini for international source: {source_name}")
         return await extract_content_with_gemini(url, source_name)
     
-    # For domestic (CafeF) sources, use traditional methods
+    # For domestic (CafeF) sources, use traditional async methods
     try:
-        print(f"🔧 Using traditional methods for domestic source: {source_name}")
-        add_random_delay()
-        session = requests.Session()
-        headers = get_enhanced_headers(url)
-        session.headers.update(headers)
+        print(f"🔧 Using async traditional methods for domestic source: {source_name}")
+        await async_sleep_delay()
         
-        response = session.get(url, timeout=15, allow_redirects=True)
+        content = await fetch_with_aiohttp(url)
         
-        if response.status_code == 200:
-            # Method 1: Trafilatura
+        if content:
+            # Method 1: Trafilatura with async execution
             if TRAFILATURA_AVAILABLE:
                 try:
-                    result = trafilatura.bare_extraction(
-                        response.content,
+                    result = await asyncio.to_thread(
+                        trafilatura.bare_extraction,
+                        content,
                         include_comments=False,
                         include_tables=True,
                         include_links=False,
@@ -633,37 +458,15 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                     )
                     
                     if result and result.get('text') and len(result['text']) > 300:
-                        content = result['text']
-                        session.close()
-                        return content.strip()
+                        return result['text'].strip()
                 except Exception as e:
                     print(f"⚠️ Trafilatura failed: {e}")
             
-            # Method 2: Newspaper3k
-            if NEWSPAPER_AVAILABLE:
-                try:
-                    session.close()
-                    article = Article(url)
-                    article.set_config({
-                        'headers': headers,
-                        'timeout': 15
-                    })
-                    
-                    article.download()
-                    article.parse()
-                    
-                    if article.text and len(article.text) > 300:
-                        return article.text.strip()
-                
-                except Exception as e:
-                    print(f"⚠️ Newspaper3k failed: {e}")
-            
-            # Method 3: BeautifulSoup for CafeF
+            # Method 2: BeautifulSoup with async execution
             if BEAUTIFULSOUP_AVAILABLE:
                 try:
-                    soup = BeautifulSoup(response.content, 'html.parser')
+                    soup = await asyncio.to_thread(BeautifulSoup, content, 'html.parser')
                     
-                    # CafeF-specific selectors
                     content_selectors = [
                         'div.detail-content',
                         'div.fck_detail',
@@ -675,27 +478,25 @@ async def extract_content_enhanced(url, source_name, news_item=None):
                         'main'
                     ]
                     
-                    content = ""
+                    extracted_text = ""
                     for selector in content_selectors:
                         elements = soup.select(selector)
                         if elements:
                             for element in elements:
                                 text = element.get_text(strip=True)
                                 if len(text) > 500:
-                                    content = text
+                                    extracted_text = text
                                     break
-                            if content:
+                            if extracted_text:
                                 break
                     
-                    if content and len(content) > 500:
-                        content = clean_content_enhanced(content)
-                        session.close()
-                        return content.strip()
+                    if extracted_text and len(extracted_text) > 500:
+                        cleaned_content = clean_content_enhanced(extracted_text)
+                        return cleaned_content.strip()
                         
                 except Exception as e:
                     print(f"⚠️ BeautifulSoup failed: {e}")
         
-        session.close()
         print(f"⚠️ All traditional methods failed for {source_name}")
         return create_fallback_content(url, source_name, "Traditional extraction methods failed")
         
@@ -708,7 +509,6 @@ def clean_content_enhanced(content):
     if not content:
         return content
     
-    # Remove common patterns
     unwanted_patterns = [
         r'Theo.*?CafeF.*?',
         r'Nguồn.*?:.*?',
@@ -722,63 +522,33 @@ def clean_content_enhanced(content):
     for pattern in unwanted_patterns:
         content = re.sub(pattern, '', content, flags=re.IGNORECASE | re.DOTALL)
     
-    # Remove excessive whitespace
     content = re.sub(r'\s+', ' ', content)
     content = re.sub(r'\n\s*\n', '\n', content)
     
     return content.strip()
 
-# 🚀 OPTIMIZED NEWS COLLECTION - Reduced limits to prevent timeout
-async def collect_news_enhanced(sources_dict, limit_per_source=20):  # Reduced from 50
-    """OPTIMIZED news collection with RSS feeds + direct scraping"""
+# 🚀 ASYNC NEWS COLLECTION - Fully non-blocking
+async def collect_news_enhanced(sources_dict, limit_per_source=15):
+    """FIXED: Fully async news collection to prevent heartbeat blocking"""
     all_news = []
     
+    # Create tasks for concurrent processing
+    tasks = []
     for source_name, source_url in sources_dict.items():
-        retry_count = 0
-        max_retries = 2  # Reduced from 3
-        
-        while retry_count < max_retries:
-            try:
-                print(f"🔄 Processing {source_name} (attempt {retry_count + 1}): {source_url}")
-                
-                # Determine if it's RSS or direct scraping
-                if source_url.endswith('.rss') or 'rss' in source_url.lower() or 'feeds.' in source_url:
-                    # RSS Feed processing
-                    news_items = await process_rss_feed(source_name, source_url, limit_per_source)
-                else:
-                    # Direct scraping for Yahoo Finance news pages
-                    news_items = scrape_yahoo_finance_news(source_url, limit_per_source)
-                
-                if news_items:
-                    duplicates_found = 0
-                    for news_item in news_items:
-                        if not is_duplicate_article(news_item, source_name):
-                            all_news.append(news_item)
-                        else:
-                            duplicates_found += 1
-                    
-                    entries_processed = len(news_items) - duplicates_found
-                    print(f"✅ Processed {entries_processed} unique entries from {source_name} (skipped {duplicates_found} duplicates)")
-                    break  # Success, exit retry loop
-                else:
-                    if retry_count < max_retries - 1:
-                        retry_count += 1
-                        print(f"🔄 Retrying {source_name}...")
-                        time.sleep(1)  # Reduced sleep time
-                        continue
-                    else:
-                        print(f"❌ No content from {source_name} after {max_retries} attempts")
-                        break
-                
-            except Exception as e:
-                print(f"❌ Error for {source_name}: {e}")
-                if retry_count < max_retries - 1:
-                    retry_count += 1
-                    print(f"🔄 Retrying {source_name}...")
-                    time.sleep(1)  # Reduced sleep time
-                else:
-                    print(f"❌ Failed to fetch from {source_name} after {max_retries} attempts")
-                    break
+        task = process_single_source(source_name, source_url, limit_per_source)
+        tasks.append(task)
+    
+    # Process all sources concurrently
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Collect results
+    for result in results:
+        if isinstance(result, Exception):
+            print(f"❌ Source processing error: {result}")
+        elif result:
+            for news_item in result:
+                if not is_duplicate_article(news_item, news_item['source']):
+                    all_news.append(news_item)
     
     print(f"📊 Total unique news collected: {len(all_news)}")
     
@@ -786,32 +556,36 @@ async def collect_news_enhanced(sources_dict, limit_per_source=20):  # Reduced f
     all_news.sort(key=lambda x: x['published'], reverse=True)
     return all_news
 
-async def process_rss_feed(source_name, rss_url, limit_per_source):
-    """Process RSS feed with enhanced error handling"""
+async def process_single_source(source_name, source_url, limit_per_source):
+    """Process a single RSS source asynchronously"""
     try:
-        add_random_delay()
-        session = requests.Session()
-        headers = get_enhanced_headers(rss_url)
-        session.headers.update(headers)
+        print(f"🔄 Processing {source_name}: {source_url}")
         
-        response = session.get(rss_url, timeout=10, allow_redirects=True)  # Reduced timeout
-        
-        if response.status_code == 200:
-            feed = feedparser.parse(response.content)
-        elif response.status_code in [403, 429]:
-            print(f"⚠️ Rate limited for {source_name}, waiting...")
-            time.sleep(random.uniform(2.0, 4.0))  # Reduced wait time
-            headers['User-Agent'] = random.choice(USER_AGENTS)
-            session.headers.update(headers)
-            response = session.get(rss_url, timeout=10, allow_redirects=True)
-            if response.status_code == 200:
-                feed = feedparser.parse(response.content)
-            else:
-                feed = feedparser.parse(rss_url)
+        if source_url.endswith('.rss') or 'rss' in source_url.lower() or 'feeds.' in source_url:
+            # RSS Feed processing
+            return await process_rss_feed_async(source_name, source_url, limit_per_source)
         else:
-            feed = feedparser.parse(rss_url)
+            # For future expansion - direct scraping
+            return []
+            
+    except Exception as e:
+        print(f"❌ Error for {source_name}: {e}")
+        return []
+
+async def process_rss_feed_async(source_name, rss_url, limit_per_source):
+    """FIXED: Async RSS feed processing to prevent blocking"""
+    try:
+        await async_sleep_delay()
         
-        session.close()
+        # Use aiohttp instead of requests
+        content = await fetch_with_aiohttp(rss_url)
+        
+        if content:
+            # Parse feedparser in thread to avoid blocking
+            feed = await asyncio.to_thread(feedparser.parse, content)
+        else:
+            # Fallback to direct feedparser
+            feed = await asyncio.to_thread(feedparser.parse, rss_url)
         
         if not feed or not hasattr(feed, 'entries') or len(feed.entries) == 0:
             return []
@@ -850,23 +624,28 @@ async def process_rss_feed(source_name, rss_url, limit_per_source):
             except Exception as entry_error:
                 continue
         
+        print(f"✅ Processed {len(news_items)} articles from {source_name}")
         return news_items
         
     except Exception as e:
+        print(f"❌ RSS processing error for {source_name}: {e}")
         return []
 
 def is_relevant_news(title, description, source_name):
     """Filter for relevant economic/financial news"""
-    
-    # For CafeF sources, all content is relevant (already filtered by RSS category)
+    # For CafeF sources, all content is relevant
     if 'cafef' in source_name:
         return True
     
-    # For Yahoo Finance, use relaxed filter
-    if 'yahoo_finance' in source_name:
-        return is_relevant_financial_news_relaxed(title)
+    # For international sources, use basic filter
+    financial_keywords = [
+        'stock', 'market', 'trading', 'investment', 'economy', 'economic',
+        'bitcoin', 'crypto', 'currency', 'bank', 'financial', 'finance',
+        'earnings', 'revenue', 'profit', 'inflation', 'fed', 'gdp'
+    ]
     
-    return True
+    title_lower = title.lower()
+    return any(keyword in title_lower for keyword in financial_keywords)
 
 def save_user_news_enhanced(user_id, news_list, command_type):
     """Enhanced user news saving"""
@@ -1038,7 +817,7 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=20  # Reduced timeout
+                timeout=15
             )
             
             return response.text.strip()
@@ -1074,9 +853,7 @@ Hãy thể hiện trí thông minh và kiến thức chuyên sâu của Gemini A
 7. Reference specific parts of the article
 8. ONLY analyze the provided article - do not reference other news sources unless mentioned in the original
 
-**IMPORTANT:** Focus solely on the content from the provided article. Do not mention CafeF, Yahoo Finance, or other sources unless they appear in the original article.
-
-Provide INTELLIGENT and DETAILED analysis:"""
+**IMPORTANT:** Focus solely on the content from the provided article. Provide INTELLIGENT and DETAILED analysis:"""
 
             model = genai.GenerativeModel('gemini-2.0-flash-exp')
             
@@ -1092,73 +869,13 @@ Provide INTELLIGENT and DETAILED analysis:"""
                     prompt,
                     generation_config=generation_config
                 ),
-                timeout=30  # Reduced timeout
+                timeout=20
             )
             
             return response.text.strip()
             
         except asyncio.TimeoutError:
             return "⚠️ Gemini AI timeout khi phân tích bài báo."
-        except Exception as e:
-            return f"⚠️ Lỗi Gemini AI: {str(e)}"
-    
-    async def debate_perspectives(self, topic: str):
-        """Multi-perspective debate system with distinct moral characteristics"""
-        if not self.available:
-            return "⚠️ Gemini AI không khả dụng cho debate."
-        
-        try:
-            prompt = f"""Bạn là Gemini AI với khả năng đóng nhiều vai trò khác nhau. Hãy tổ chức một cuộc tranh luận về chủ đề sau từ 6 góc nhìn khác nhau với tính cách đạo đức riêng biệt:
-
-**CHỦ ĐỀ TRANH LUẬN:** {topic}
-
-**CÁC THÂN PHẬN THAM GIA:**
-1. **Nhà Kinh Tế Học Tham Nhũng** - Có đạo đức nghề nghiệp tệ hại, bóp méo số liệu, chỉ phục vụ quyền lợi cá nhân
-2. **Phó Giáo Sư Tiến Sĩ Chính Trực** - Có đạo đức cao, học thuật nghiêm túc, quan tâm lợi ích chung
-3. **Nhân Viên VP Ham Tiền** - Chỉ quan tâm lương thưởng, sẵn sàng vứt bỏ đạo đức vì lợi nhuận
-4. **Người Nghèo Vô Học** - Tầng lớp thấp, không học thức, đạo đức tệ, hay đổ lỗi cho người khác
-5. **Người Giàu Ích Kỷ** - Chỉ tìm cách bỏ tiền vào túi mình, không quan tâm hậu quả xã hội
-6. **Người Giàu Thông Thái** - Có tầm nhìn xa, hiểu biết sâu rộng, quan tâm phát triển bền vững
-
-**YÊU CẦU:**
-- Mỗi thân phận đưa ra 1 đoạn tranh luận (100-150 từ)
-- Thể hiện RÕ RÀNG tính cách đạo đức và động cơ của từng nhân vật
-- Tạo ra mâu thuẫn và xung đột quan điểm
-- Phản ánh thực tế xã hội một cách sắc bén
-- Kết thúc bằng phân tích tổng hợp từ Gemini AI
-
-**FORMAT:**
-💸 **Nhà KT Học Tham Nhũng:** [quan điểm ích kỷ, bóp méo]
-👨‍🏫 **PGS.TS Chính Trực:** [quan điểm học thuật, đạo đức cao]
-💼 **Nhân Viên Ham Tiền:** [chỉ quan tâm lương thưởng]
-😠 **Người Nghèo Vô Học:** [đổ lỗi, thiếu hiểu biết]
-🤑 **Người Giàu Ích Kỷ:** [chỉ tìm lợi nhuận cá nhân]
-🧠 **Người Giàu Thông Thái:** [tầm nhìn xa, phát triển bền vững]
-🤖 **Gemini AI - Tổng Kết:** [phân tích khách quan các quan điểm]
-
-Hãy tạo ra cuộc tranh luận gay gắt và phản ánh thực tế xã hội:"""
-
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
-            generation_config = genai.types.GenerationConfig(
-                temperature=0.4,
-                top_p=0.9,
-                max_output_tokens=2000,
-            )
-            
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    model.generate_content,
-                    prompt,
-                    generation_config=generation_config
-                ),
-                timeout=25  # Reduced timeout
-            )
-            
-            return response.text.strip()
-            
-        except asyncio.TimeoutError:
-            return "⚠️ Gemini AI timeout khi tổ chức debate."
         except Exception as e:
             return f"⚠️ Lỗi Gemini AI: {str(e)}"
 
@@ -1175,7 +892,7 @@ async def on_ready():
     
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     
-    status_text = f"News Bot • {total_sources} sources"
+    status_text = f"News Bot • {total_sources} FREE sources"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -1184,7 +901,7 @@ async def on_ready():
     )
     
     print(f"🤖 Gemini AI: {ai_status}")
-    print(f"📊 Sources: {total_sources}")
+    print(f"📊 FREE Sources: {total_sources}")
     print(f"🕰️ Started: {current_datetime_str}")
 
 @bot.event
@@ -1198,17 +915,20 @@ async def on_command_error(ctx, error):
     else:
         await ctx.send(f"❌ Lỗi: {str(error)}")
 
-# 🆕 ENHANCED COMMANDS
+# 🆕 ENHANCED COMMANDS - ALL ASYNC
 
 @bot.command(name='all')
 async def get_all_news_enhanced(ctx, page=1):
-    """Tin tức từ CafeF và Yahoo Finance với Gemini-powered extraction"""
+    """Tin tức từ CafeF và các nguồn free quốc tế"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải...")
+        loading_msg = await ctx.send(f"⏳ Đang tải tin từ {len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])} nguồn miễn phí...")
         
-        domestic_news = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)  # Reduced limit
-        international_news = await collect_news_enhanced(RSS_FEEDS['international'], 30)  # Reduced limit
+        # Concurrent processing
+        domestic_task = collect_news_enhanced(RSS_FEEDS['domestic'], 15)
+        international_task = collect_news_enhanced(RSS_FEEDS['international'], 20)
+        
+        domestic_news, international_news = await asyncio.gather(domestic_task, international_task)
         
         await loading_msg.delete()
         
@@ -1230,28 +950,22 @@ async def get_all_news_enhanced(ctx, page=1):
         domestic_count = sum(1 for news in page_news if news['source'] in RSS_FEEDS['domestic'])
         international_count = len(page_news) - domestic_count
         
-        # MASSIVE source mapping for 20+ RSS feeds
+        # Enhanced source mapping for FREE sources only
         source_names = {
             # CafeF sources
             'cafef_chungkhoan': 'CafeF CK', 'cafef_batdongsan': 'CafeF BĐS',
             'cafef_taichinh': 'CafeF TC', 'cafef_vimo': 'CafeF VM', 'cafef_doanhnghiep': 'CafeF DN',
             
-            # Yahoo Finance sources
+            # FREE international sources
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_rss': 'Yahoo Finance', 'yahoo_finance_crypto': 'Yahoo Crypto',
-            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_stock_market': 'Yahoo Stocks',
-            
-            # Major financial news sources
-            'cnn_money': 'CNN Money', 'reuters_topnews': 'Reuters', 'marketwatch': 'MarketWatch',
-            'business_insider': 'Business Insider', 'forbes': 'Forbes', 'wsj': 'Wall Street Journal',
-            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 'seekingalpha': 'Seeking Alpha',
-            'financial_times': 'Financial Times', 'fortune': 'Fortune', 'economist': 'The Economist',
-            'nasdaq': 'Nasdaq', 'washington_post_biz': 'Washington Post', 'guardian_business': 'The Guardian',
-            'investopedia': 'Investopedia', 'nikkei_asia': 'Nikkei Asia', 'economic_times': 'Economic Times',
-            'bbc_news': 'BBC News', 'coindesk': 'CoinDesk',
-            
-            # Scraped sources
-            'yahoo_finance_scraped': 'Yahoo Scraped'
+            'yahoo_finance_rss': 'Yahoo Finance', 'cnn_money': 'CNN Money', 
+            'reuters_topnews': 'Reuters', 'reuters_business': 'Reuters Biz',
+            'marketwatch': 'MarketWatch', 'business_insider': 'Business Insider',
+            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 
+            'investopedia': 'Investopedia', 'economic_times': 'Economic Times',
+            'bbc_business': 'BBC Business', 'guardian_business': 'The Guardian',
+            'coindesk': 'CoinDesk', 'nasdaq_news': 'Nasdaq',
+            'seeking_alpha': 'Seeking Alpha', 'benzinga': 'Benzinga'
         }
         
         emoji_map = {
@@ -1259,23 +973,17 @@ async def get_all_news_enhanced(ctx, page=1):
             'cafef_chungkhoan': '📈', 'cafef_batdongsan': '🏢', 'cafef_taichinh': '💰', 
             'cafef_vimo': '📊', 'cafef_doanhnghiep': '🏭',
             
-            # Yahoo Finance sources
+            # FREE international sources
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
-            'yahoo_finance_crypto': '💰', 'yahoo_finance_tech': '💻', 'yahoo_finance_stock_market': '📈',
-            
-            # Major financial news sources
-            'cnn_money': '📺', 'reuters_topnews': '🌍', 'marketwatch': '📊', 'business_insider': '💼',
-            'forbes': '💎', 'wsj': '📰', 'cnbc': '📺', 'investing_com': '💹', 'seekingalpha': '🔍',
-            'financial_times': '📊', 'fortune': '💰', 'economist': '🎯', 'nasdaq': '📈',
-            'washington_post_biz': '📰', 'guardian_business': '🛡️', 'investopedia': '📚',
-            'nikkei_asia': '🌏', 'economic_times': '🇮🇳', 'bbc_news': '🇬🇧', 'coindesk': '₿',
-            
-            # Scraped sources
-            'yahoo_finance_scraped': '🚀'
+            'cnn_money': '📺', 'reuters_topnews': '🌍', 'reuters_business': '🌍',
+            'marketwatch': '📊', 'business_insider': '💼', 'cnbc': '📺', 
+            'investing_com': '💹', 'investopedia': '📚', 'economic_times': '🇮🇳',
+            'bbc_business': '🇬🇧', 'guardian_business': '🛡️', 'coindesk': '₿',
+            'nasdaq_news': '📈', 'seeking_alpha': '🔍', 'benzinga': '🚀'
         }
         
-        # Simple statistics
-        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 International: {international_count} • 📊 Tổng: {len(all_news)}\n🔥 NEW: 20+ RSS feeds từ GitHub sources!"
+        # Statistics
+        stats_field = f"🇻🇳 CafeF: {domestic_count} • 🌍 Quốc tế: {international_count} • 📊 Tổng: {len(all_news)}\n✅ 100% nguồn tin MIỄN PHÍ - Không paywall!"
         fields_data.append(("📊 Thống kê", stats_field))
         
         for i, news in enumerate(page_news, 1):
@@ -1290,7 +998,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"📰 Tin tức (Trang {page})",
+            f"📰 Tin tức miễn phí (Trang {page})",
             "",
             fields_data,
             0x00ff88
@@ -1300,7 +1008,7 @@ async def get_all_news_enhanced(ctx, page=1):
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số]")
+            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số] • 100% FREE")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1310,12 +1018,12 @@ async def get_all_news_enhanced(ctx, page=1):
 
 @bot.command(name='out')
 async def get_international_news_enhanced(ctx, page=1):
-    """Tin tức quốc tế - Fixed Yahoo Finance URLs 2025"""
+    """Tin tức quốc tế - ONLY FREE sources"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải...")
+        loading_msg = await ctx.send(f"⏳ Đang tải từ {len(RSS_FEEDS['international'])} nguồn miễn phí...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 30)  # Reduced limit
+        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 20)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1331,39 +1039,29 @@ async def get_international_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 International News: {len(news_list)} tin\n🔥 20+ RSS sources: CNN, Reuters, WSJ, Forbes, BBC và nhiều hơn!\n✅ URLs from GitHub verified 2025"
+        stats_field = f"📰 FREE International News: {len(news_list)} tin\n✅ Yahoo, CNN, Reuters, BBC, CNBC và nhiều hơn!\n🚫 Đã loại bỏ TẤT CẢ nguồn paywall (WSJ, Bloomberg, FT)"
         fields_data.append(("📊 Thông tin", stats_field))
         
-        # MASSIVE source names for international sources
+        # FREE source names only
         source_names = {
-            # Yahoo Finance sources
             'yahoo_finance_main': 'Yahoo RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_rss': 'Yahoo Finance', 'yahoo_finance_crypto': 'Yahoo Crypto',
-            'yahoo_finance_tech': 'Yahoo Tech', 'yahoo_finance_stock_market': 'Yahoo Stocks',
-            
-            # Major financial news sources
-            'cnn_money': 'CNN Money', 'reuters_topnews': 'Reuters', 'marketwatch': 'MarketWatch',
-            'business_insider': 'Business Insider', 'forbes': 'Forbes', 'wsj': 'Wall Street Journal',
-            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 'seekingalpha': 'Seeking Alpha',
-            'financial_times': 'Financial Times', 'fortune': 'Fortune', 'economist': 'The Economist',
-            'nasdaq': 'Nasdaq', 'washington_post_biz': 'Washington Post', 'guardian_business': 'The Guardian',
-            'investopedia': 'Investopedia', 'nikkei_asia': 'Nikkei Asia', 'economic_times': 'Economic Times',
-            'bbc_news': 'BBC News', 'coindesk': 'CoinDesk',
-            'yahoo_finance_scraped': 'Yahoo Scraped'
+            'yahoo_finance_rss': 'Yahoo Finance', 'cnn_money': 'CNN Money', 
+            'reuters_topnews': 'Reuters', 'reuters_business': 'Reuters Business',
+            'marketwatch': 'MarketWatch', 'business_insider': 'Business Insider',
+            'cnbc': 'CNBC', 'investing_com': 'Investing.com', 
+            'investopedia': 'Investopedia', 'economic_times': 'Economic Times',
+            'bbc_business': 'BBC Business', 'guardian_business': 'The Guardian',
+            'coindesk': 'CoinDesk', 'nasdaq_news': 'Nasdaq',
+            'seeking_alpha': 'Seeking Alpha', 'benzinga': 'Benzinga'
         }
         
         emoji_map = {
-            # Yahoo Finance sources
             'yahoo_finance_main': '💼', 'yahoo_finance_headlines': '📰', 'yahoo_finance_rss': '💼',
-            'yahoo_finance_crypto': '💰', 'yahoo_finance_tech': '💻', 'yahoo_finance_stock_market': '📈',
-            
-            # Major financial news sources
-            'cnn_money': '📺', 'reuters_topnews': '🌍', 'marketwatch': '📊', 'business_insider': '💼',
-            'forbes': '💎', 'wsj': '📰', 'cnbc': '📺', 'investing_com': '💹', 'seekingalpha': '🔍',
-            'financial_times': '📊', 'fortune': '💰', 'economist': '🎯', 'nasdaq': '📈',
-            'washington_post_biz': '📰', 'guardian_business': '🛡️', 'investopedia': '📚',
-            'nikkei_asia': '🌏', 'economic_times': '🇮🇳', 'bbc_news': '🇬🇧', 'coindesk': '₿',
-            'yahoo_finance_scraped': '🚀'
+            'cnn_money': '📺', 'reuters_topnews': '🌍', 'reuters_business': '🌍',
+            'marketwatch': '📊', 'business_insider': '💼', 'cnbc': '📺', 
+            'investing_com': '💹', 'investopedia': '📚', 'economic_times': '🇮🇳',
+            'bbc_business': '🇬🇧', 'guardian_business': '🛡️', 'coindesk': '₿',
+            'nasdaq_news': '📈', 'seeking_alpha': '🔍', 'benzinga': '🚀'
         }
         
         for i, news in enumerate(page_news, 1):
@@ -1378,7 +1076,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         # Create embeds
         embeds = create_safe_embed_with_fields(
-            f"🌍 Tin nước ngoài (Trang {page})",
+            f"🌍 Tin nước ngoài miễn phí (Trang {page})",
             "",
             fields_data,
             0x0066ff
@@ -1388,7 +1086,7 @@ async def get_international_news_enhanced(ctx, page=1):
         
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
         for i, embed in enumerate(embeds):
-            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số]")
+            embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số] • FREE ONLY")
         
         for embed in embeds:
             await ctx.send(embed=embed)
@@ -1398,12 +1096,12 @@ async def get_international_news_enhanced(ctx, page=1):
 
 @bot.command(name='in')
 async def get_domestic_news_enhanced(ctx, page=1):
-    """Tin tức trong nước - CafeF với traditional extraction"""
+    """Tin tức trong nước - CafeF"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳ Đang tải...")
+        loading_msg = await ctx.send(f"⏳ Đang tải từ CafeF...")
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 20)  # Reduced limit
+        news_list = await collect_news_enhanced(RSS_FEEDS['domestic'], 15)
         await loading_msg.delete()
         
         items_per_page = 12
@@ -1419,7 +1117,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
         # Prepare fields data
         fields_data = []
         
-        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN"
+        stats_field = f"📰 Tổng tin CafeF: {len(news_list)} tin\n🎯 Lĩnh vực: CK, BĐS, TC, VM, DN\n✅ Nguồn tin uy tín trong nước"
         fields_data.append(("📊 Thông tin", stats_field))
         
         source_names = {
@@ -1464,7 +1162,7 @@ async def get_domestic_news_enhanced(ctx, page=1):
 
 @bot.command(name='chitiet')
 async def get_news_detail_enhanced(ctx, news_number: int):
-    """Chi tiết bài viết - Gemini cho tin nước ngoài, traditional cho tin trong nước"""
+    """Chi tiết bài viết - Async extraction"""
     try:
         user_id = ctx.author.id
         
@@ -1484,23 +1182,22 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Save as last detail for !hoi context
         save_user_last_detail(user_id, news)
         
-        # Determine extraction method based on source
+        # Determine extraction method
         if is_international_source(news['source']):
-            loading_msg = await ctx.send(f"⏳ Đang tải bằng Gemini AI cho {news['source']}...")
+            loading_msg = await ctx.send(f"⏳ Đang trích xuất bằng Gemini AI...")
         else:
-            loading_msg = await ctx.send(f"⏳ Đang tải...")
+            loading_msg = await ctx.send(f"⏳ Đang trích xuất nội dung...")
         
-        # Enhanced content extraction - NOW USES GEMINI FOR ALL INTERNATIONAL
+        # Enhanced async content extraction
         full_content = await extract_content_enhanced(news['link'], news['source'], news)
         
-        # Enhanced source names
+        # Enhanced source names for FREE sources only
         source_names = {
             'cafef_chungkhoan': 'CafeF Chứng Khoán', 'cafef_batdongsan': 'CafeF Bất Động Sản',
             'cafef_taichinh': 'CafeF Tài Chính', 'cafef_vimo': 'CafeF Vĩ Mô', 'cafef_doanhnghiep': 'CafeF Doanh Nghiệp',
             'yahoo_finance_main': 'Yahoo Finance RSS', 'yahoo_finance_headlines': 'Yahoo Headlines',
-            'yahoo_finance_scraped': 'Yahoo Finance Scraped', 'marketwatch': 'MarketWatch',
-            'reuters_topnews': 'Reuters', 'cnn_money': 'CNN Money', 'forbes': 'Forbes',
-            'wsj': 'Wall Street Journal', 'cnbc': 'CNBC', 'bbc_news': 'BBC News'
+            'marketwatch': 'MarketWatch', 'reuters_topnews': 'Reuters', 'cnn_money': 'CNN Money',
+            'cnbc': 'CNBC', 'bbc_business': 'BBC Business', 'investing_com': 'Investing.com'
         }
         
         source_name = source_names.get(news['source'], news['source'])
@@ -1510,7 +1207,6 @@ async def get_news_detail_enhanced(ctx, news_number: int):
         # Create content with metadata
         main_title = f"📖 Chi tiết tin {news_number}"
         
-        # Simple metadata
         content_with_meta = f"**📰 {news['title']}**\n"
         content_with_meta += f"**🕰️ {news['published_str']}** • **📰 {source_name}**\n\n"
         content_with_meta += f"{full_content}"
@@ -1525,8 +1221,7 @@ async def get_news_detail_enhanced(ctx, news_number: int):
                 f"[Đọc bài viết gốc]({news['link']})"
             )
             optimized_embeds[-1].add_field(name=safe_name, value=safe_value, inline=False)
-            
-            optimized_embeds[-1].set_footer(text=f"Tin số {news_number}")
+            optimized_embeds[-1].set_footer(text=f"Tin số {news_number} • FREE source")
         
         # Send all embeds
         for i, embed in enumerate(optimized_embeds, 1):
@@ -1554,16 +1249,12 @@ async def enhanced_gemini_question(ctx, *, question):
             await ctx.send(embed=embed)
             return
         
-        current_datetime_str = get_current_datetime_str()
-        
-        # Check if user has recent !chitiet context
+        # Check for recent !chitiet context
         user_id = ctx.author.id
         context = ""
-        context_info = ""
         
         if user_id in user_last_detail_cache:
             last_detail = user_last_detail_cache[user_id]
-            # Check if accessed within last 30 minutes
             time_diff = get_current_vietnam_datetime() - last_detail['timestamp']
             
             if time_diff.total_seconds() < 1800:  # 30 minutes
@@ -1574,7 +1265,6 @@ async def enhanced_gemini_question(ctx, *, question):
                 
                 if article_content:
                     context = f"BÀI BÁO LIÊN QUAN:\nTiêu đề: {article['title']}\nNguồn: {article['source']}\nNội dung: {article_content[:1500]}"
-                    context_info = f"📰 **Context:** Bài báo vừa xem"
         
         progress_embed = create_safe_embed(
             "🤖 Gemini AI",
@@ -1586,19 +1276,16 @@ async def enhanced_gemini_question(ctx, *, question):
         
         # Get Gemini response
         if context:
-            # Article analysis mode
             analysis_result = await gemini_engine.analyze_article(context, question)
         else:
-            # General question mode
             analysis_result = await gemini_engine.ask_question(question, context)
         
         # Create optimized embeds
         title = f"🤖 Gemini AI"
         optimized_embeds = create_optimized_embeds(title, analysis_result, 0x00ff88)
         
-        # Simple footer
         if optimized_embeds:
-            optimized_embeds[-1].set_footer(text=f"Gemini AI")
+            optimized_embeds[-1].set_footer(text=f"Gemini AI • FREE sources")
         
         # Send optimized embeds
         await progress_msg.edit(embed=optimized_embeds[0])
@@ -1609,72 +1296,13 @@ async def enhanced_gemini_question(ctx, *, question):
     except Exception as e:
         await ctx.send(f"❌ Lỗi hệ thống Gemini: {str(e)}")
 
-@bot.command(name='debate')
-async def gemini_debate_system(ctx, *, topic=""):
-    """Multi-perspective debate system với Gemini"""
-    try:
-        if not gemini_engine.available:
-            embed = create_safe_embed(
-                "⚠️ Gemini AI không khả dụng",
-                "Cần Gemini API key để hoạt động.",
-                0xff6b6b
-            )
-            await ctx.send(embed=embed)
-            return
-        
-        # Determine debate topic
-        if not topic:
-            # Use last !chitiet article if available
-            user_id = ctx.author.id
-            if user_id in user_last_detail_cache:
-                last_detail = user_last_detail_cache[user_id]
-                time_diff = get_current_vietnam_datetime() - last_detail['timestamp']
-                
-                if time_diff.total_seconds() < 1800:  # 30 minutes
-                    article = last_detail['article']
-                    topic = f"Bài báo: {article['title']}"
-                else:
-                    await ctx.send("❌ Vui lòng nhập chủ đề debate hoặc xem bài báo bằng !chitiet trước.")
-                    return
-            else:
-                await ctx.send("❌ Vui lòng nhập chủ đề debate! Ví dụ: `!debate lạm phát hiện tại`")
-                return
-        
-        progress_embed = create_safe_embed(
-            "🎭 Gemini Debate",
-            f"Chủ đề: {topic[:100]}...",
-            0xff9900
-        )
-        
-        progress_msg = await ctx.send(embed=progress_embed)
-        
-        # Get debate analysis
-        debate_result = await gemini_engine.debate_perspectives(topic)
-        
-        # Create optimized embeds
-        title = f"🎭 Debate"
-        optimized_embeds = create_optimized_embeds(title, debate_result, 0xff6600)
-        
-        # Simple footer
-        if optimized_embeds:
-            optimized_embeds[-1].set_footer(text=f"Gemini Debate")
-        
-        # Send optimized embeds
-        await progress_msg.edit(embed=optimized_embeds[0])
-        
-        for embed in optimized_embeds[1:]:
-            await ctx.send(embed=embed)
-        
-    except Exception as e:
-        await ctx.send(f"❌ Lỗi hệ thống debate: {str(e)}")
-
 @bot.command(name='menu')
 async def help_command_optimized(ctx):
-    """Simple menu guide"""
+    """Simple menu guide for FREE sources"""
     
     main_embed = create_safe_embed(
-        "📰 News Bot - 20+ RSS Sources",
-        "CafeF + CNN + Reuters + WSJ + Forbes + BBC + 15 more!",
+        "📰 News Bot - 100% FREE Sources",
+        "CafeF + CNN + Reuters + Yahoo + BBC + 10+ sources miễn phí!",
         0x00ff88
     )
     
@@ -1686,39 +1314,49 @@ async def help_command_optimized(ctx):
     
     safe_name2, safe_value2 = validate_embed_field(
         "🤖 Lệnh AI",
-        "**!hoi [câu hỏi]** - Hỏi AI\n**!debate [chủ đề]** - Tranh luận"
+        "**!hoi [câu hỏi]** - Hỏi AI\n**!status** - Trạng thái hệ thống"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
     
+    safe_name3, safe_value3 = validate_embed_field(
+        "✅ Cải tiến 2025",
+        "🚫 Đã loại bỏ TẤT CẢ nguồn paywall\n⚡ Tối ưu async - không bị heartbeat block\n🤖 Gemini AI trích xuất thông minh\n📱 100% nguồn tin miễn phí"
+    )
+    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
+    
     await ctx.send(embed=main_embed)
 
-# 🆕 STATUS COMMAND
 @bot.command(name='status')
 async def status_command(ctx):
-    """Hiển thị trạng thái hệ thống"""
+    """Hiển thị trạng thái hệ thống - FREE sources only"""
     
-    # System statistics
     total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
     global_cache_size = len(global_seen_articles)
     
     main_embed = create_safe_embed(
-        "📊 Trạng thái hệ thống - 20+ RSS Sources",
+        "📊 Trạng thái hệ thống - FREE Sources Only",
         "",
         0x00ff88
     )
     
     safe_name1, safe_value1 = validate_embed_field(
         "📰 Nguồn tin",
-        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 International: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n🔥 20+ RSS feeds từ GitHub sources!\n✅ CNN, Reuters, WSJ, Forbes, BBC..."
+        f"🇻🇳 CafeF: {len(RSS_FEEDS['domestic'])}\n🌍 International: {len(RSS_FEEDS['international'])}\n📊 Tổng: {total_sources}\n✅ 100% nguồn tin MIỄN PHÍ\n🚫 Đã loại bỏ WSJ, Bloomberg, FT"
     )
     main_embed.add_field(name=safe_name1, value=safe_value1, inline=True)
     
     gemini_status = "✅" if gemini_engine.available else "❌"
     safe_name2, safe_value2 = validate_embed_field(
         "🤖 AI System",
-        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}\n⚡ Optimized timeouts"
+        f"Gemini AI: {gemini_status}\nCache: {global_cache_size}\n⚡ Async optimized\n🚫 No blocking functions"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=True)
+    
+    safe_name3, safe_value3 = validate_embed_field(
+        "🔧 Cải tiến 2025",
+        f"✅ Fixed heartbeat blocking\n✅ aiohttp thay requests\n✅ asyncio.sleep thay time.sleep\n✅ Concurrent processing\n✅ Gemini content extraction"
+    )
+    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
     
     await ctx.send(embed=main_embed)
 
@@ -1730,12 +1368,13 @@ if __name__ == "__main__":
         
         total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
         
-        print("🚀 Starting MASSIVE RSS News Bot...")
-        print(f"🔧 Sources: {total_sources} (20+ RSS feeds)")
+        print("🚀 Starting ENHANCED FREE RSS News Bot...")
+        print(f"🔧 FREE Sources: {total_sources}")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
-        print("🔥 MASSIVE RSS collection from GitHub sources")
-        print("📰 CNN, Reuters, WSJ, Forbes, BBC, CNBC + more!")
-        print("⚡ Optimized timeouts and limits")
+        print("✅ FIXED: Heartbeat blocking với async/await")
+        print("✅ FIXED: Loại bỏ TẤT CẢ nguồn paywall")
+        print("✅ FIXED: Content extraction với Gemini")
+        print("⚡ NO MORE: time.sleep, requests blocking")
         print("=" * 40)
         
         bot.run(TOKEN)
