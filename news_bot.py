@@ -367,10 +367,13 @@ def scrape_yahoo_finance_news(base_url, limit=30):
                         
                         # Filter for financial/economic content
                         if is_relevant_financial_news(title):
+                            # Clean selector name for source
+                            clean_selector = selector.replace(' ', '_').replace('[', '').replace(']', '').replace('*', '').replace('=', '').replace('"', '').replace('/', '')
+                            
                             news_item = {
                                 'title': html.unescape(title.strip()),
                                 'link': link,
-                                'source': f"yahoo_finance_scraped_{selector.replace(' ', '_').replace('[', '').replace(']', '').replace('*', '').replace('=', '').replace('\"', '').replace('/', '')}",
+                                'source': f"yahoo_finance_scraped_{clean_selector}",
                                 'published': get_current_vietnam_datetime(),
                                 'published_str': get_current_vietnam_datetime().strftime("%H:%M %d/%m"),
                                 'description': title[:200] + "..." if len(title) > 200 else title
