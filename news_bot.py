@@ -1703,6 +1703,8 @@ if __name__ == "__main__":
         keep_alive()
         print("🌐 Keep-alive server started")
         
+        total_sources = len(RSS_FEEDS['domestic']) + len(RSS_FEEDS['international'])
+        
         print("🚀 Starting News Bot...")
         print(f"🔧 Sources: {total_sources}")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
