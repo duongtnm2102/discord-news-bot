@@ -162,42 +162,88 @@ def generate_article_hash(title, link, description=""):
     content = f"{clean_title}|{clean_link}"
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
-def is_duplicate_article(news_item, source_name):
-    """Check if article is duplicate using multiple methods"""
+def clean_expired_cache():
+    """Clean expired articles from global cache"""
+    global global_seen_articles
+    current_time = get_current_vietnam_datetime()
+    expired_hashes = []
+    
+    for article_hash, article_data in global_seen_articles.items():
+        time_diff = current_time - article_data['timestamp']
+        if time_diff.total_seconds() > (CACHE_EXPIRE_HOURS * 3600):
+            expired_hashes.append(article_hash)
+    
+    for expired_hash in expired_hashes:
+        del global_seen_articles[expired_hash]
+    
+    if expired_hashes:
+        print(f"🧹 Cleaned {len(expired_hashes)} expired articles from cache")
+
+def normalize_title(title):
+    """Normalize title for exact comparison"""
+    import re
+    # Convert to lowercase and remove extra spaces
+    normalized = re.sub(r'\s+', ' ', title.lower().strip())
+    # Remove common punctuation that might vary
+    normalized = re.sub(r'[.,!?;:\-\u2013\u2014]', '', normalized)
+    # Remove quotes that might vary
+    normalized = re.sub(r'["\'\u201c\u201d\u2018\u2019]', '', normalized)
+    return normalized
+
+def is_duplicate_article_local(news_item, existing_articles):
+    """Check duplicate within current collection - EXACT TITLE MATCH ONLY"""
+    current_title = normalize_title(news_item['title'])
+    current_link = news_item['link'].lower().strip()
+    
+    for existing in existing_articles:
+        existing_title = normalize_title(existing['title'])
+        existing_link = existing['link'].lower().strip()
+        
+        # Check exact title match OR exact link match
+        if current_title == existing_title or current_link == existing_link:
+            return True
+    
+    return False
+
+def is_duplicate_article_global(news_item, source_name):
+    """Check duplicate against global cache - EXACT TITLE MATCH ONLY"""
     global global_seen_articles
     
     try:
-        article_hash = generate_article_hash(news_item['title'], news_item['link'], news_item.get('description', ''))
+        # Clean expired cache first
+        clean_expired_cache()
         
-        if article_hash in global_seen_articles:
-            return True
+        current_title = normalize_title(news_item['title'])
+        current_link = news_item['link'].lower().strip()
         
-        title_words = set(news_item['title'].lower().split())
-        
-        for existing_hash, existing_data in list(global_seen_articles.items()):  # Convert to list to avoid runtime errors
-            existing_title_words = set(existing_data['title'].lower().split())
+        # Check against global cache - EXACT matches only
+        for existing_data in global_seen_articles.values():
+            existing_title = normalize_title(existing_data['title'])
+            existing_link = existing_data['link'].lower().strip()
             
-            if len(title_words) > 3 and len(existing_title_words) > 3:
-                similarity = len(title_words.intersection(existing_title_words)) / len(title_words.union(existing_title_words))
-                if similarity > 0.8:
-                    return True
+            if current_title == existing_title or current_link == existing_link:
+                return True
         
-        global_seen_articles[article_hash] = {
+        # Add to global cache using simple key
+        cache_key = f"{current_title}|{current_link}"
+        
+        global_seen_articles[cache_key] = {
             'title': news_item['title'],
             'link': news_item['link'],
             'source': source_name,
             'timestamp': get_current_vietnam_datetime()
         }
         
+        # Limit cache size
         if len(global_seen_articles) > MAX_GLOBAL_CACHE:
             sorted_items = sorted(global_seen_articles.items(), key=lambda x: x[1]['timestamp'])
-            for old_hash, _ in sorted_items[:100]:
-                del global_seen_articles[old_hash]
+            for old_key, _ in sorted_items[:100]:
+                del global_seen_articles[old_key]
         
         return False
         
     except Exception as e:
-        print(f"⚠️ Duplicate check error: {e}")
+        print(f"⚠️ Global duplicate check error: {e}")
         return False
 
 # 🔧 CONTENT VALIDATION FOR DISCORD
@@ -573,9 +619,16 @@ def clean_content_enhanced(content):
     return content.strip()
 
 # 🚀 ASYNC NEWS COLLECTION - Fully non-blocking
-async def collect_news_enhanced(sources_dict, limit_per_source=15):
-    """FIXED: Fully async news collection to prevent heartbeat blocking"""
+async def collect_news_enhanced(sources_dict, limit_per_source=15, use_global_dedup=False):
+    """Session-based collection with EXACT TITLE duplicate detection"""
     all_news = []
+    
+    print(f"🔄 Starting collection from {len(sources_dict)} sources (Global dedup: {use_global_dedup})")
+    print(f"🎯 Duplicate logic: EXACT title match only")
+    
+    # Clean expired cache before starting
+    if use_global_dedup:
+        clean_expired_cache()
     
     # Create tasks for concurrent processing
     tasks = []
@@ -586,16 +639,35 @@ async def collect_news_enhanced(sources_dict, limit_per_source=15):
     # Process all sources concurrently
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    # Collect results
+    # Collect results with exact title duplicate detection
+    total_processed = 0
+    local_duplicates = 0
+    global_duplicates = 0
+    
     for result in results:
         if isinstance(result, Exception):
             print(f"❌ Source processing error: {result}")
         elif result:
             for news_item in result:
-                if not is_duplicate_article(news_item, news_item['source']):
-                    all_news.append(news_item)
+                total_processed += 1
+                
+                # Local duplicate check (exact title/link match within current collection)
+                if is_duplicate_article_local(news_item, all_news):
+                    local_duplicates += 1
+                    print(f"🔄 Local duplicate: {news_item['title'][:50]}...")
+                    continue
+                
+                # Global duplicate check (exact title/link match cross-session) - only if enabled
+                if use_global_dedup and is_duplicate_article_global(news_item, news_item['source']):
+                    global_duplicates += 1
+                    print(f"🌍 Global duplicate: {news_item['title'][:50]}...")
+                    continue
+                
+                # Add unique article
+                all_news.append(news_item)
     
-    print(f"📊 Total unique news collected: {len(all_news)}")
+    unique_count = len(all_news)
+    print(f"📊 Processed: {total_processed}, Local dups: {local_duplicates}, Global dups: {global_duplicates}, Unique: {unique_count}")
     
     # Sort by publish time
     all_news.sort(key=lambda x: x['published'], reverse=True)
@@ -677,28 +749,67 @@ async def process_rss_feed_async(source_name, rss_url, limit_per_source):
         return []
 
 def is_relevant_news(title, description, source_name):
-    """Filter for relevant economic/financial news"""
+    """Filter for relevant economic/financial news - MORE RELAXED"""
     # For CafeF sources, all content is relevant
     if 'cafef' in source_name:
         return True
     
-    # For international sources, use basic filter
+    # For international sources, use very relaxed filter
     financial_keywords = [
         'stock', 'market', 'trading', 'investment', 'economy', 'economic',
         'bitcoin', 'crypto', 'currency', 'bank', 'financial', 'finance',
-        'earnings', 'revenue', 'profit', 'inflation', 'fed', 'gdp'
+        'earnings', 'revenue', 'profit', 'inflation', 'fed', 'gdp',
+        'business', 'company', 'corporate', 'industry', 'sector',
+        'money', 'cash', 'capital', 'fund', 'price', 'cost', 'value',
+        'growth', 'analyst', 'forecast', 'report', 'data', 'sales'
     ]
     
     title_lower = title.lower()
-    return any(keyword in title_lower for keyword in financial_keywords)
+    description_lower = description.lower() if description else ""
+    
+    # Check in both title and description
+    for keyword in financial_keywords:
+        if keyword in title_lower or keyword in description_lower:
+            return True
+    
+    # If no keywords found, still include (very relaxed)
+    return True  # Changed from False to True - accept all articles
 
-def save_user_news_enhanced(user_id, news_list, command_type):
-    """Enhanced user news saving"""
+def get_or_collect_user_news(user_id, command_type, sources_dict, limit_per_source=15):
+    """Get cached news or collect new ones for consistent pagination"""
+    global user_news_cache
+    
+    # Check if user has recent cached news for this command
+    if user_id in user_news_cache:
+        cached_data = user_news_cache[user_id]
+        time_diff = get_current_vietnam_datetime() - cached_data['timestamp']
+        
+        # If cache is recent (< 10 minutes) and same command type, use it
+        if time_diff.total_seconds() < 600 and cached_data['command'].startswith(command_type):
+            print(f"📱 Using cached news for user {user_id}: {len(cached_data['news'])} articles")
+            return cached_data['news'], True  # True = from cache
+    
+    print(f"🔄 Need to collect fresh news for user {user_id}")
+    return [], False  # False = need to collect
+
+async def collect_and_cache_news(user_id, command_type, sources_dict, limit_per_source=15):
+    """Collect fresh news and cache for user"""
+    # Collect with minimal global deduplication for fresh session
+    all_news = await collect_news_enhanced(sources_dict, limit_per_source, use_global_dedup=False)
+    
+    # Cache for user
+    save_user_news_enhanced(user_id, all_news, command_type)
+    
+    return all_news
+
+def save_user_news_enhanced(user_id, news_list, command_type, current_page=1):
+    """Enhanced user news saving with pagination info"""
     global user_news_cache
     
     user_news_cache[user_id] = {
-        'news': news_list,
+        'news': news_list,  # Full news list
         'command': command_type,
+        'current_page': current_page,
         'timestamp': get_current_vietnam_datetime()
     }
     
@@ -706,6 +817,14 @@ def save_user_news_enhanced(user_id, news_list, command_type):
         oldest_users = sorted(user_news_cache.items(), key=lambda x: x[1]['timestamp'])[:10]
         for user_id_to_remove, _ in oldest_users:
             del user_news_cache[user_id_to_remove]
+
+def save_user_page_context(user_id, page_news, page_number):
+    """Save current page context for !chitiet"""
+    global user_news_cache
+    
+    if user_id in user_news_cache:
+        user_news_cache[user_id]['current_page'] = page_number
+        user_news_cache[user_id]['current_page_news'] = page_news  # Current page's 12 items
 
 def save_user_last_detail(user_id, news_item):
     """Save last article accessed via !chitiet"""
@@ -1027,8 +1146,13 @@ async def get_all_news_enhanced(ctx, page=1):
         page_news = all_news[start_index:end_index]
         
         if not page_news:
-            total_pages = (len(all_news) + items_per_page - 1) // items_per_page
-            await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
+            total_pages = (len(all_news) + items_per_page - 1) // items_per_page if all_news else 0
+            
+            # If no news and cache is large, suggest clearing cache
+            if len(global_seen_articles) > 200:
+                await ctx.send(f"❌ Không có tin tức ở trang {page}! Cache có thể đầy. Dùng `!clear` để xóa cache hoặc `!debug` để kiểm tra.")
+            else:
+                await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
             return
         
         # Prepare fields data
@@ -1093,6 +1217,10 @@ async def get_all_news_enhanced(ctx, page=1):
         save_user_news_enhanced(ctx.author.id, page_news, f"all_page_{page}")
         
         total_pages = (len(all_news) + items_per_page - 1) // items_per_page
+        
+        # Save current page context for !chitiet (for both cached and fresh data)
+        save_user_page_context(user_id, page_news, page)
+        
         for i, embed in enumerate(embeds):
             embed.set_footer(text=f"{page}/{total_pages}")
         
@@ -1104,13 +1232,25 @@ async def get_all_news_enhanced(ctx, page=1):
 
 @bot.command(name='out')
 async def get_international_news_enhanced(ctx, page=1):
-    """Tin tức quốc tế - ONLY FREE sources"""
+    """Tin tức quốc tế - CONSISTENT PAGINATION"""
     try:
         page = max(1, int(page))
-        loading_msg = await ctx.send(f"⏳")
+        user_id = ctx.author.id
         
-        news_list = await collect_news_enhanced(RSS_FEEDS['international'], 20)
-        await loading_msg.delete()
+        # Check cached news first
+        cached_news, is_cached = get_or_collect_user_news(user_id, "out", RSS_FEEDS['international'])
+        
+        if is_cached:
+            news_list = cached_news
+        else:
+            loading_msg = await ctx.send(f"⏳")
+            
+            news_list = await collect_news_enhanced(RSS_FEEDS['international'], 20, use_global_dedup=False)
+            
+            # Cache for consistent pagination
+            save_user_news_enhanced(user_id, news_list, "out")
+            
+            await loading_msg.delete()
         
         items_per_page = 12
         start_index = (page - 1) * items_per_page
@@ -1118,7 +1258,7 @@ async def get_international_news_enhanced(ctx, page=1):
         page_news = news_list[start_index:end_index]
         
         if not page_news:
-            total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+            total_pages = (len(news_list) + items_per_page - 1) // items_per_page if news_list else 0
             await ctx.send(f"❌ Không có tin tức ở trang {page}! Tổng cộng có {total_pages} trang.")
             return
         
@@ -1126,6 +1266,8 @@ async def get_international_news_enhanced(ctx, page=1):
         fields_data = []
         
         stats_field = f"🌍 {len(news_list)} tin"
+        if is_cached:
+            stats_field += " (cached)"
         fields_data.append(("📊", stats_field))
         
         # FREE source names only - FIXED
@@ -1165,9 +1307,19 @@ async def get_international_news_enhanced(ctx, page=1):
             0x0066ff
         )
         
-        save_user_news_enhanced(ctx.author.id, page_news, f"out_page_{page}")
-        
         total_pages = (len(news_list) + items_per_page - 1) // items_per_page
+        
+        # Save current page context (for both cached and fresh data)
+        save_user_page_context(user_id, page_news, page)
+        
+        for i, embed in enumerate(embeds):
+            embed.set_footer(text=f"{page}/{total_pages}")
+        
+        for embed in embeds:
+            await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {str(e)}")
         for i, embed in enumerate(embeds):
             embed.set_footer(text=f"Trang {page}/{total_pages} • !chitiet [số] • FREE ONLY")
         
@@ -1434,11 +1586,89 @@ async def help_command_optimized(ctx):
     
     safe_name2, safe_value2 = validate_embed_field(
         "🤖 AI", 
-        "!hoi [question] - Ask AI\n!debate [topic] - Debate\n!status - Status"
+        "!hoi [question] - Ask AI\n!debate [topic] - Debate"
     )
     main_embed.add_field(name=safe_name2, value=safe_value2, inline=False)
     
+    safe_name3, safe_value3 = validate_embed_field(
+        "🔧 Debug",
+        "!status - Status\n!debug - Cache info\n!clear - Clear cache\n!test_dup [title] - Test duplicate"
+    )
+    main_embed.add_field(name=safe_name3, value=safe_value3, inline=False)
+    
     await ctx.send(embed=main_embed)
+
+@bot.command(name='clear')
+async def clear_cache_command(ctx):
+    """Clear global cache"""
+    global global_seen_articles
+    cache_size = len(global_seen_articles)
+    global_seen_articles.clear()
+    await ctx.send(f"🧹 Cleared {cache_size} articles from cache")
+
+@bot.command(name='debug')
+async def debug_command(ctx):
+    """Debug cache status and duplicate logic"""
+    global global_seen_articles
+    
+    cache_size = len(global_seen_articles)
+    current_time = get_current_vietnam_datetime()
+    
+    # Count recent vs old articles
+    recent_count = 0
+    old_count = 0
+    
+    for article_data in global_seen_articles.values():
+        time_diff = current_time - article_data['timestamp']
+        if time_diff.total_seconds() < (CACHE_EXPIRE_HOURS * 3600):
+            recent_count += 1
+        else:
+            old_count += 1
+    
+    # Show sample of cached titles
+    sample_titles = []
+    for i, (key, data) in enumerate(list(global_seen_articles.items())[:3]):
+        normalized = normalize_title(data['title'])
+        sample_titles.append(f"• {normalized[:40]}...")
+        if i >= 2:  # Only show first 3
+            break
+    
+    embed = create_safe_embed(
+        "🔧 Debug Info",
+        f"**Cache:** {cache_size} articles\n**Recent:** {recent_count}\n**Old:** {old_count}\n\n**Duplicate Logic:** EXACT title match only\n\n**Sample cached titles:**\n" + "\n".join(sample_titles),
+        0xff9900
+    )
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name='test_dup')
+async def test_duplicate_logic(ctx, *, test_title=""):
+    """Test duplicate detection with a title"""
+    if not test_title:
+        await ctx.send("❌ Nhập tiêu đề để test! Ví dụ: `!test_dup Bitcoin tăng giá mạnh`")
+        return
+    
+    normalized = normalize_title(test_title)
+    
+    # Check against cache
+    is_duplicate = False
+    matching_title = ""
+    
+    for article_data in global_seen_articles.values():
+        existing_normalized = normalize_title(article_data['title'])
+        if normalized == existing_normalized:
+            is_duplicate = True
+            matching_title = article_data['title']
+            break
+    
+    embed = create_safe_embed(
+        "🧪 Duplicate Test",
+        f"**Input:** {test_title}\n**Normalized:** {normalized}\n\n**Result:** {'🔴 DUPLICATE' if is_duplicate else '✅ UNIQUE'}" + 
+        (f"\n**Matches:** {matching_title}" if is_duplicate else ""),
+        0xff0000 if is_duplicate else 0x00ff00
+    )
+    
+    await ctx.send(embed=embed)
 
 @bot.command(name='status')
 async def status_command(ctx):
@@ -1480,6 +1710,7 @@ if __name__ == "__main__":
         print(f"🔧 FREE Sources: {total_sources}")
         print(f"🤖 Gemini: {'✅' if gemini_engine.available else '❌'}")
         print("✅ Fixed: Heartbeat, Paywall, Content")
+        print("🎯 Duplicate: EXACT title match only")
         print("=" * 30)
         
         bot.run(TOKEN)
